@@ -1,29 +1,18 @@
+import { Routes, Route } from "react-router-dom";
 import Navbar from "./components/layout/Navbar";
-import Hero from "./components/landing/Hero";
-import Statistics from "./components/landing/Statistics";
-import HowItWorks from "./components/landing/HowItWorks";
-import RideTypes from "./components/landing/RideTypes";
-import AISection from "./components/landing/AISection";
-import Universities from "./components/landing/Universities";
-import Sustainability from "./components/landing/Sustainability";
-import Testimonials from "./components/landing/Testimonials";
-import AppPreview from "./components/landing/AppPreview";
-import Footer from "./components/landing/Footer";
+import LandingPage from "./pages/LandingPage";
+import RidesPage from "./pages/RidesPage";
+import ChatboxWidget from "./components/chatbot/ChatboxWidget";
 
 function App() {
   return (
     <>
       <Navbar />
-      <Hero />
-      <Statistics />
-      <HowItWorks />
-      <RideTypes />
-      <AISection />
-      <Universities />
-      <Sustainability />
-      <Testimonials />
-      <AppPreview />
-      <Footer />
+      <Routes>
+        <Route path="/" element={<LandingPage />} />
+        <Route path="/rides" element={<RidesPage />} />
+      </Routes>
+      <ChatboxWidget />
     </>
   );
 }

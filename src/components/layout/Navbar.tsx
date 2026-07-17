@@ -1,4 +1,5 @@
 import { Menu } from "lucide-react";
+import { Link } from "react-router-dom";
 
 export default function Navbar() {
   return (
@@ -19,11 +20,14 @@ export default function Navbar() {
         borderBottom: "1px solid #ececec",
       }}
     >
-      <div
+      <Link
+        to="/"
         style={{
           display: "flex",
           alignItems: "center",
           gap: "12px",
+          textDecoration: "none",
+          color: "inherit",
         }}
       >
         <div
@@ -49,7 +53,7 @@ export default function Navbar() {
         >
           RideMate
         </h2>
-      </div>
+      </Link>
 
       <div
         style={{
@@ -58,17 +62,17 @@ export default function Navbar() {
           fontWeight: 600,
         }}
       >
-        <a href="#">Home</a>
-        <a href="#">Features</a>
-        <a href="#">Community</a>
-        <a href="#">Universities</a>
-        <a href="#">About</a>
+        <Link to="/" style={{ color: "inherit", textDecoration: "none" }}>Home</Link>
+        <Link to="/rides" style={{ color: "inherit", textDecoration: "none" }}>Find a Ride</Link>
+        <a href="#universities">Universities</a>
+        <a href="#about">About</a>
       </div>
 
       <div
         style={{
           display: "flex",
           gap: "15px",
+          alignItems: "center",
         }}
       >
         <button
@@ -83,7 +87,8 @@ export default function Navbar() {
           Login
         </button>
 
-        <button
+        <Link
+          to="/rides"
           style={{
             border: "none",
             background: "#16a34a",
@@ -92,10 +97,13 @@ export default function Navbar() {
             borderRadius: "30px",
             cursor: "pointer",
             fontWeight: 700,
+            textDecoration: "none",
+            display: "inline-flex",
+            alignItems: "center",
           }}
         >
           Create Ride
-        </button>
+        </Link>
 
         <Menu />
       </div>
