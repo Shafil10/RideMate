@@ -1,0 +1,32 @@
+export default function Statistics() {
+  const stats = [
+    { value: "4.5M+", label: "University Students" },
+    { value: "40+", label: "Partner Universities" },
+    { value: "30%", label: "Average Cost Saved" },
+    { value: "95%", label: "AI Route Match" },
+  ];
+
+  return (
+    <section
+      style={{
+        background: "#16a34a",
+        color: "white",
+        padding: "70px 100px",
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-around",
+        }}
+      >
+        {stats.map((item) => (
+          <div key={item.label} style={{ textAlign: "center" }}>
+            <h1 style={{ fontSize: "52px", margin: 0 }}>{item.value}</h1>
+            <p style={{ fontSize: "18px", opacity: 0.9 }}>{item.label}</p>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
