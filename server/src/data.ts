@@ -1,3 +1,17 @@
+export interface User {
+  id: string;
+  name: string;
+  email: string;
+  password: string;
+  university: string;
+}
+
+export const users: User[] = [
+  { id: "u1", name: "Rafiq Islam", email: "rafiq@buet.ac.bd", password: "ridemate123", university: "BUET" },
+  { id: "u2", name: "Nusrat Jahan", email: "nusrat@aiub.edu", password: "ridemate123", university: "AIUB" },
+  { id: "u3", name: "Demo Student", email: "demo@ridemate.app", password: "demo1234", university: "North South University" },
+];
+
 export type RideType = "shared-taxi" | "student-driver";
 
 export interface Ride {

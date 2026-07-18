@@ -1,7 +1,11 @@
 import { Menu } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import { useAuth } from "../../context/AuthContext";
 
 export default function Navbar() {
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
+
   return (
     <nav
       style={{
@@ -75,17 +79,44 @@ export default function Navbar() {
           alignItems: "center",
         }}
       >
-        <button
-          style={{
-            border: "none",
-            background: "#eee",
-            padding: "12px 20px",
-            borderRadius: "30px",
-            cursor: "pointer",
-          }}
-        >
-          Login
-        </button>
+        {user ? (
+          <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+            <span style={{ fontWeight: 600, fontSize: 14 }}>Hi, {user.name.split(" ")[0]}</span>
+            <button
+              onClick={() => {
+                logout();
+                navigate("/");
+              }}
+              style={{
+                border: "none",
+                background: "#eee",
+                padding: "12px 20px",
+                borderRadius: "30px",
+                cursor: "pointer",
+              }}
+            >
+              Logout
+            </button>
+          </div>
+        ) : (
+          <Link
+            to="/login"
+            style={{
+              border: "none",
+              background: "#eee",
+              padding: "12px 20px",
+              borderRadius: "30px",
+              cursor: "pointer",
+              textDecoration: "none",
+              color: "inherit",
+              fontWeight: 400,
+              display: "inline-flex",
+              alignItems: "center",
+            }}
+          >
+            Login
+          </Link>
+        )}
 
         <Link
           to="/rides"
