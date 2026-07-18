@@ -1,36 +1,24 @@
-<<<<<<< HEAD
-# React + TypeScript + Vite
-
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
-
-Currently, two official plugins are available:
-
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
-
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the Oxlint configuration
-
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
-
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
-```
-
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
-=======
 # RideMate
->>>>>>> 6adce3f5d3411ea7fe90e91d61a32c8e0bb1b5b5
+
+React + TypeScript + Vite frontend with Node.js backend.
+
+## Tech Stack
+- **Frontend**: React 19, TypeScript, Vite, Tailwind CSS
+- **Backend**: Node.js
+- **Linting**: Oxlint
+- **UI Components**: Framer Motion, Lucide Icons
+
+## Available Scripts
+
+- `npm run dev` - Start frontend dev server (http://localhost:5173)
+- `npm run dev:server` - Start backend dev server
+- `npm run dev:all` - Run frontend and backend concurrently
+- `npm run build` - Build for production
+- `npm run lint` - Run Oxlint checks
+- `npm run preview` - Preview production build
+
+## Getting Started
+
+1. Install dependencies: `npm install`
+2. Run development servers: `npm run dev:all`
+3. Open http://localhost:5173 in your browser
