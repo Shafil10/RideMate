@@ -7,16 +7,19 @@ Three members, three devices, one repo: `github.com/Shafil10/RideMate`.
 | Branch | Owner |
 |---|---|
 | `main` | protected — always the working, CI-passing version of the app |
-| `member1-work` | rename to the actual person's name/feature when assigned |
-| `member2-work` | rename to the actual person's name/feature when assigned |
-| `member3-work` | rename to the actual person's name/feature when assigned |
+| `shafil` | Shafil |
+| `sadid` | Sadid |
+| `shafin` | Shafin |
 
-To rename a branch (do this once, then tell the other two to re-fetch):
+## Branch isolation — how this actually works
+
+All branches started as an identical copy of `main`, so right after creation they look the same — that's expected, not a bug. A branch only diverges once its owner commits on it. As long as each person stays checked out on **their own branch** before committing, their commits appear only on that branch; the other two branches and `main` are untouched until a PR is merged.
+
+**Before every commit, double-check which branch you're on:**
 ```
-git branch -m member1-work <new-name>
-git push origin -u <new-name>
-git push origin --delete member1-work
+git branch
 ```
+The one with `*` next to it is where your commit will go. If it's not your branch, run `git checkout <your-name>` first.
 
 ## Daily workflow (each member, on their own device)
 
