@@ -1,6 +1,23 @@
 import { CarFront, Users, Leaf, Sparkles } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "../../context/AuthContext";
 
 export default function Hero() {
+  const { user } = useAuth();
+  const navigate = useNavigate();
+
+  function handleCreateCommute() {
+    if (user) {
+      navigate("/rides#create");
+    } else {
+      navigate("/login", { state: { from: "/rides#create" } });
+    }
+  }
+
+  function handleExploreRides() {
+    navigate("/rides#browse");
+  }
+
   return (
     <section
       style={{
@@ -68,6 +85,7 @@ export default function Hero() {
           }}
         >
           <button
+            onClick={handleCreateCommute}
             style={{
               padding: "18px 36px",
               background: "#16a34a",
@@ -82,6 +100,7 @@ export default function Hero() {
           </button>
 
           <button
+            onClick={handleExploreRides}
             style={{
               padding: "18px 36px",
               background: "white",

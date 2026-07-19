@@ -52,3 +52,14 @@ export function joinRide(id: string): Promise<{ ride: Ride }> {
 export function sendChatMessage(message: string): Promise<{ reply: string; topicId: string }> {
   return request("/chatbot/message", { method: "POST", body: JSON.stringify({ message }) });
 }
+
+export interface AuthUser {
+  id: string;
+  name: string;
+  email: string;
+  university: string;
+}
+
+export function login(email: string, password: string): Promise<{ token: string; user: AuthUser }> {
+  return request("/auth/login", { method: "POST", body: JSON.stringify({ email, password }) });
+}
