@@ -119,7 +119,8 @@ export default function Navbar() {
         )}
 
         <Link
-          to="/rides"
+          to={user ? "/rides#create" : "/login"}
+          state={user ? undefined : { from: "/rides#create" }}
           style={{
             border: "none",
             background: "#16a34a",
