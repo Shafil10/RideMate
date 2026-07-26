@@ -1,0 +1,68 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(cuid())
+  name         String
+  email        String   @unique
+  passwordHash String
+  university   String
+  createdAt    DateTime @default(now())
+
+  rides        Ride[]
+  chatMessages ChatMessage[]
+}
+
+model Ride {
+  id            String   @id @default(cuid())
+  type          String
+  origin        String
+  destination   String
+  university    String
+  departureTime DateTime
+  seatsTotal    Int
+  seatsTaken    Int      @default(0)
+  farePerSeat   Int
+  createdAt     DateTime @default(now())
+
+  driver   User   @relation(fields: [driverId], references: [id])
+  driverId String
+}
+
+model ChatMessage {
+  id         String   @id @default(cuid())
+  message    String
+  reply      String
+  topicId    String
+  createdAt  DateTime @default(now())
+
+  user   User?   @relation(fields: [userId], references: [id])
+  userId String?
+}
+
+model Stat {
+  id    String @id @default(cuid())
+  value String
+  label String
+  order Int    @default(0)
+}
+
+model University {
+  id    String @id @default(cuid())
+  name  String
+  order Int    @default(0)
+}
+
+model Testimonial {
+  id    String @id @default(cuid())
+  name  String
+  text  String
+  order Int    @default(0)
+}
