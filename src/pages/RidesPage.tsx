@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { createRide, fetchRides, joinRide, type Ride } from "../lib/api";
+import { cancelBooking, createRide, fetchRides, joinRide, type Ride } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
+
+const CANCELLATION_FEE = 50;
 
 const emptyForm = {
   type: "student-driver" as Ride["type"],
@@ -20,12 +22,16 @@ export default function RidesPage() {
   const [rides, setRides] = useState<Ride[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [form, setForm] = useState(emptyForm);
   const [submitting, setSubmitting] = useState(false);
+  const [joiningRideId, setJoiningRideId] = useState<string | null>(null);
+  const [pickupPoint, setPickupPoint] = useState("");
+  const [busyRideId, setBusyRideId] = useState<string | null>(null);
 
   function loadRides() {
     setLoading(true);
-    fetchRides()
+    fetchRides(token)
       .then((data) => setRides(data.rides))
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
@@ -33,7 +39,8 @@ export default function RidesPage() {
 
   useEffect(() => {
     loadRides();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token]);
 
   useEffect(() => {
     if (!location.hash) return;
@@ -57,17 +64,54 @@ export default function RidesPage() {
     }
   }
 
-  async function handleJoin(id: string) {
+  function handleJoinClick(id: string) {
     if (!token) {
       navigate("/login", { state: { from: "/rides#browse" } });
       return;
     }
     setError(null);
+    setNotice(null);
+    setPickupPoint("");
+    setJoiningRideId(id);
+  }
+
+  async function handleConfirmJoin(id: string) {
+    if (!token || !pickupPoint.trim()) {
+      setError("Enter a pickup point on the ride's route before confirming.");
+      return;
+    }
+    setBusyRideId(id);
+    setError(null);
     try {
-      await joinRide(id, token);
+      await joinRide(id, pickupPoint.trim(), token);
+      setJoiningRideId(null);
+      setPickupPoint("");
+      setNotice("Seat reserved. See you at the pickup point!");
       loadRides();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to join ride.");
+    } finally {
+      setBusyRideId(null);
+    }
+  }
+
+  async function handleCancelBooking(id: string) {
+    if (!token) return;
+    const confirmed = window.confirm(
+      `Cancel your booking on this ride? A ৳${CANCELLATION_FEE} compensation fee applies for cancelling after booking.`,
+    );
+    if (!confirmed) return;
+
+    setBusyRideId(id);
+    setError(null);
+    try {
+      const { cancellationFee } = await cancelBooking(id, token);
+      setNotice(`Booking cancelled. Compensation fee charged: ৳${cancellationFee}.`);
+      loadRides();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to cancel booking.");
+    } finally {
+      setBusyRideId(null);
     }
   }
 
@@ -81,6 +125,12 @@ export default function RidesPage() {
       {error && (
         <div style={{ background: "#fee2e2", color: "#991b1b", padding: "12px 16px", borderRadius: 8, marginBottom: 24 }}>
           {error}
+        </div>
+      )}
+
+      {notice && (
+        <div style={{ background: "#dcfce7", color: "#166534", padding: "12px 16px", borderRadius: 8, marginBottom: 24 }}>
+          {notice}
         </div>
       )}
 
@@ -220,6 +270,7 @@ export default function RidesPage() {
         <div style={{ display: "grid", gap: 16 }}>
           {rides.map((ride) => {
             const full = ride.seatsTaken >= ride.seatsTotal;
+            const busy = busyRideId === ride.id;
             return (
               <div
                 key={ride.id}
@@ -228,36 +279,120 @@ export default function RidesPage() {
                   border: "1px solid #ececec",
                   borderRadius: 12,
                   padding: 20,
+                  flexDirection: "column",
+                  alignItems: "stretch",
                 }}
               >
-                <div>
-                  <div style={{ fontWeight: 700 }}>
-                    {ride.origin} → {ride.destination}
+                <div className="ride-card" style={{ padding: 0, border: "none" }}>
+                  <div>
+                    <div style={{ fontWeight: 700 }}>
+                      {ride.origin} → {ride.destination}
+                    </div>
+                    <div style={{ color: "#555", fontSize: 14 }}>
+                      {ride.university} · {new Date(ride.departureTime).toLocaleString()} ·{" "}
+                      {ride.type === "shared-taxi" ? "Shared Taxi Ride" : "Student Driver Ride"}
+                    </div>
+                    <div style={{ color: "#555", fontSize: 14 }}>
+                      Driver: {ride.driverName} · {ride.seatsTaken}/{ride.seatsTotal} seats taken · ৳{ride.farePerSeat}/seat
+                    </div>
+                    {ride.myBooking && (
+                      <div style={{ color: "#166534", fontSize: 14, marginTop: 6, fontWeight: 600 }}>
+                        Your pickup point: {ride.myBooking.pickupPoint}
+                      </div>
+                    )}
                   </div>
-                  <div style={{ color: "#555", fontSize: 14 }}>
-                    {ride.university} · {new Date(ride.departureTime).toLocaleString()} ·{" "}
-                    {ride.type === "shared-taxi" ? "Shared Taxi Ride" : "Student Driver Ride"}
-                  </div>
-                  <div style={{ color: "#555", fontSize: 14 }}>
-                    Driver: {ride.driverName} · {ride.seatsTaken}/{ride.seatsTotal} seats taken · ৳{ride.farePerSeat}/seat
-                  </div>
+
+                  {ride.myBooking ? (
+                    <button
+                      onClick={() => handleCancelBooking(ride.id)}
+                      disabled={busy}
+                      style={{
+                        background: "#fee2e2",
+                        color: "#991b1b",
+                        border: "none",
+                        padding: "10px 20px",
+                        borderRadius: 24,
+                        fontWeight: 700,
+                        cursor: busy ? "default" : "pointer",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {busy ? "Cancelling..." : `Cancel booking (৳${CANCELLATION_FEE} fee)`}
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => handleJoinClick(ride.id)}
+                      disabled={full}
+                      style={{
+                        background: full ? "#e5e7eb" : "#16a34a",
+                        color: full ? "#6b7280" : "white",
+                        border: "none",
+                        padding: "10px 20px",
+                        borderRadius: 24,
+                        fontWeight: 700,
+                        cursor: full ? "not-allowed" : "pointer",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {full ? "Full" : user ? "Join" : "Log in to join"}
+                    </button>
+                  )}
                 </div>
-                <button
-                  onClick={() => handleJoin(ride.id)}
-                  disabled={full}
-                  style={{
-                    background: full ? "#e5e7eb" : "#16a34a",
-                    color: full ? "#6b7280" : "white",
-                    border: "none",
-                    padding: "10px 20px",
-                    borderRadius: 24,
-                    fontWeight: 700,
-                    cursor: full ? "not-allowed" : "pointer",
-                    whiteSpace: "nowrap",
-                  }}
-                >
-                  {full ? "Full" : user ? "Join" : "Log in to join"}
-                </button>
+
+                {joiningRideId === ride.id && (
+                  <div
+                    style={{
+                      marginTop: 16,
+                      paddingTop: 16,
+                      borderTop: "1px solid #ececec",
+                      display: "flex",
+                      gap: 10,
+                      flexWrap: "wrap",
+                      alignItems: "center",
+                    }}
+                  >
+                    <input
+                      autoFocus
+                      placeholder="Pickup point on this route (e.g. Mirpur 10 main road)"
+                      value={pickupPoint}
+                      onChange={(e) => setPickupPoint(e.target.value)}
+                      style={{ ...inputStyle, flex: "1 1 260px" }}
+                    />
+                    <button
+                      onClick={() => handleConfirmJoin(ride.id)}
+                      disabled={busy}
+                      style={{
+                        background: "#16a34a",
+                        color: "white",
+                        border: "none",
+                        padding: "10px 20px",
+                        borderRadius: 24,
+                        fontWeight: 700,
+                        cursor: busy ? "default" : "pointer",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {busy ? "Confirming..." : "Confirm seat"}
+                    </button>
+                    <button
+                      onClick={() => {
+                        setJoiningRideId(null);
+                        setPickupPoint("");
+                      }}
+                      style={{
+                        background: "none",
+                        border: "1px solid #d1d5db",
+                        padding: "10px 20px",
+                        borderRadius: 24,
+                        fontWeight: 600,
+                        cursor: "pointer",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      Dismiss
+                    </button>
+                  </div>
+                )}
               </div>
             );
           })}

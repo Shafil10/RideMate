@@ -10,6 +10,7 @@ export interface Ride {
   farePerSeat: number;
   driverName: string;
   createdAt: string;
+  myBooking: { id: string; pickupPoint: string } | null;
 }
 
 export interface NewRideInput {
@@ -39,16 +40,20 @@ async function request<T>(path: string, options?: RequestInit, token?: string | 
   return res.json();
 }
 
-export function fetchRides(): Promise<{ rides: Ride[] }> {
-  return request("/rides");
+export function fetchRides(token?: string | null): Promise<{ rides: Ride[] }> {
+  return request("/rides", undefined, token);
 }
 
 export function createRide(input: NewRideInput, token: string): Promise<{ ride: Ride }> {
   return request("/rides", { method: "POST", body: JSON.stringify(input) }, token);
 }
 
-export function joinRide(id: string, token: string): Promise<{ ride: Ride }> {
-  return request(`/rides/${id}/join`, { method: "POST" }, token);
+export function joinRide(id: string, pickupPoint: string, token: string): Promise<{ ride: Ride }> {
+  return request(`/rides/${id}/join`, { method: "POST", body: JSON.stringify({ pickupPoint }) }, token);
+}
+
+export function cancelBooking(id: string, token: string): Promise<{ ride: Ride; cancellationFee: number }> {
+  return request(`/rides/${id}/cancel`, { method: "POST" }, token);
 }
 
 export function sendChatMessage(message: string, token?: string | null): Promise<{ reply: string; topicId: string }> {
