@@ -20,12 +20,14 @@ export interface NewRideInput {
   departureTime: string;
   seatsTotal: number;
   farePerSeat: number;
-  driverName: string;
 }
 
-async function request<T>(path: string, options?: RequestInit): Promise<T> {
+async function request<T>(path: string, options?: RequestInit, token?: string | null): Promise<T> {
   const res = await fetch(`/api${path}`, {
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
     ...options,
   });
 
@@ -41,16 +43,16 @@ export function fetchRides(): Promise<{ rides: Ride[] }> {
   return request("/rides");
 }
 
-export function createRide(input: NewRideInput): Promise<{ ride: Ride }> {
-  return request("/rides", { method: "POST", body: JSON.stringify(input) });
+export function createRide(input: NewRideInput, token: string): Promise<{ ride: Ride }> {
+  return request("/rides", { method: "POST", body: JSON.stringify(input) }, token);
 }
 
-export function joinRide(id: string): Promise<{ ride: Ride }> {
-  return request(`/rides/${id}/join`, { method: "POST" });
+export function joinRide(id: string, token: string): Promise<{ ride: Ride }> {
+  return request(`/rides/${id}/join`, { method: "POST" }, token);
 }
 
-export function sendChatMessage(message: string): Promise<{ reply: string; topicId: string }> {
-  return request("/chatbot/message", { method: "POST", body: JSON.stringify({ message }) });
+export function sendChatMessage(message: string, token?: string | null): Promise<{ reply: string; topicId: string }> {
+  return request("/chatbot/message", { method: "POST", body: JSON.stringify({ message }) }, token);
 }
 
 export interface AuthUser {
@@ -62,4 +64,35 @@ export interface AuthUser {
 
 export function login(email: string, password: string): Promise<{ token: string; user: AuthUser }> {
   return request("/auth/login", { method: "POST", body: JSON.stringify({ email, password }) });
+}
+
+export function signup(
+  name: string,
+  email: string,
+  password: string,
+  university: string,
+): Promise<{ token: string; user: AuthUser }> {
+  return request("/auth/signup", { method: "POST", body: JSON.stringify({ name, email, password, university }) });
+}
+
+export interface Stat {
+  value: string;
+  label: string;
+}
+
+export function fetchStats(): Promise<{ stats: Stat[] }> {
+  return request("/content/stats");
+}
+
+export function fetchUniversities(): Promise<{ universities: string[] }> {
+  return request("/content/universities");
+}
+
+export interface Testimonial {
+  name: string;
+  text: string;
+}
+
+export function fetchTestimonials(): Promise<{ testimonials: Testimonial[] }> {
+  return request("/content/testimonials");
 }

@@ -3,11 +3,14 @@ import { useNavigate, useLocation, Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 
 export default function LoginPage() {
-  const { login, loading } = useAuth();
+  const { login, signup, loading } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const [mode, setMode] = useState<"login" | "signup">("login");
+  const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [university, setUniversity] = useState("");
   const [error, setError] = useState<string | null>(null);
 
   const redirectTo = (location.state as { from?: string } | null)?.from ?? "/rides";
@@ -16,10 +19,14 @@ export default function LoginPage() {
     e.preventDefault();
     setError(null);
     try {
-      await login(email, password);
+      if (mode === "signup") {
+        await signup(name, email, password, university);
+      } else {
+        await login(email, password);
+      }
       navigate(redirectTo, { replace: true });
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Login failed.");
+      setError(err instanceof Error ? err.message : "Something went wrong.");
     }
   }
 
@@ -42,9 +49,11 @@ export default function LoginPage() {
           border: "1px solid #ececec",
         }}
       >
-        <h1 style={{ fontSize: 26, marginBottom: 6 }}>Welcome back</h1>
+        <h1 style={{ fontSize: 26, marginBottom: 6 }}>{mode === "login" ? "Welcome back" : "Create your account"}</h1>
         <p style={{ color: "#555", marginBottom: 24, fontSize: 14 }}>
-          Log in with your university email to create or join rides.
+          {mode === "login"
+            ? "Log in with your university email to create or join rides."
+            : "Sign up with your university email to start creating or joining rides."}
         </p>
 
         {error && (
@@ -54,6 +63,20 @@ export default function LoginPage() {
         )}
 
         <form onSubmit={handleSubmit} style={{ display: "grid", gap: 14 }}>
+          {mode === "signup" && (
+            <label style={{ display: "grid", gap: 6, fontSize: 14, fontWeight: 600 }}>
+              Full name
+              <input
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Your name"
+                required
+                style={inputStyle}
+              />
+            </label>
+          )}
+
           <label style={{ display: "grid", gap: 6, fontSize: 14, fontWeight: 600 }}>
             University email
             <input
@@ -65,6 +88,20 @@ export default function LoginPage() {
               style={inputStyle}
             />
           </label>
+
+          {mode === "signup" && (
+            <label style={{ display: "grid", gap: 6, fontSize: 14, fontWeight: 600 }}>
+              University
+              <input
+                type="text"
+                value={university}
+                onChange={(e) => setUniversity(e.target.value)}
+                placeholder="e.g. North South University"
+                required
+                style={inputStyle}
+              />
+            </label>
+          )}
 
           <label style={{ display: "grid", gap: 6, fontSize: 14, fontWeight: 600 }}>
             Password
@@ -93,13 +130,47 @@ export default function LoginPage() {
               opacity: loading ? 0.7 : 1,
             }}
           >
-            {loading ? "Logging in..." : "Log in"}
+            {loading ? (mode === "login" ? "Logging in..." : "Signing up...") : mode === "login" ? "Log in" : "Sign up"}
           </button>
         </form>
 
         <p style={{ marginTop: 20, fontSize: 13, color: "#555" }}>
-          Demo account: <code>demo@ridemate.app</code> / <code>demo1234</code>
+          {mode === "login" ? (
+            <>
+              New to RideMate?{" "}
+              <button
+                type="button"
+                onClick={() => {
+                  setMode("signup");
+                  setError(null);
+                }}
+                style={linkButtonStyle}
+              >
+                Create an account
+              </button>
+            </>
+          ) : (
+            <>
+              Already have an account?{" "}
+              <button
+                type="button"
+                onClick={() => {
+                  setMode("login");
+                  setError(null);
+                }}
+                style={linkButtonStyle}
+              >
+                Log in
+              </button>
+            </>
+          )}
         </p>
+
+        {mode === "login" && (
+          <p style={{ marginTop: 8, fontSize: 13, color: "#555" }}>
+            Demo account: <code>demo@ridemate.app</code> / <code>demo1234</code>
+          </p>
+        )}
 
         <p style={{ marginTop: 12, fontSize: 13 }}>
           <Link to="/" style={{ color: "#16a34a", fontWeight: 600, textDecoration: "none" }}>
@@ -117,4 +188,15 @@ const inputStyle: React.CSSProperties = {
   border: "1px solid #d1d5db",
   fontSize: 14,
   fontWeight: 400,
+};
+
+const linkButtonStyle: React.CSSProperties = {
+  background: "none",
+  border: "none",
+  padding: 0,
+  color: "#16a34a",
+  fontWeight: 600,
+  fontSize: 13,
+  cursor: "pointer",
+  textDecoration: "underline",
 };
