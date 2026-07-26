@@ -8,15 +8,15 @@ export default function Statistics() {
 
   return (
     <section
+      className="rm-section"
       style={{
         background: "#16a34a",
         color: "white",
-        padding: "70px 100px",
       }}
     >
       <div
+        className="rm-row"
         style={{
-          display: "flex",
           justifyContent: "space-around",
         }}
       >

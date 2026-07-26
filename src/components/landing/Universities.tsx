@@ -14,29 +14,17 @@ const universities=[
 return(
 
 <section
+className="rm-section"
 style={{
-padding:"100px",
 background:"#fff"
 }}
 >
 
-<h1
-style={{
-textAlign:"center",
-fontSize:"48px",
-marginBottom:"60px"
-}}
->
+<h1 className="rm-heading">
 Partner Universities
 </h1>
 
-<div
-style={{
-display:"grid",
-gridTemplateColumns:"repeat(4,1fr)",
-gap:"25px"
-}}
->
+<div className="rm-grid-4">
 
 {universities.map((u)=>(
 <div

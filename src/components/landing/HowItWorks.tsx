@@ -21,27 +21,16 @@ export default function HowItWorks() {
 
   return (
     <section
+      className="rm-section"
       style={{
-        padding: "100px",
         background: "#ffffff",
       }}
     >
-      <h1
-        style={{
-          textAlign: "center",
-          fontSize: "48px",
-          marginBottom: "60px",
-        }}
-      >
+      <h1 className="rm-heading">
         How RideMate Works
       </h1>
 
-      <div
-        style={{
-          display: "flex",
-          gap: "35px",
-        }}
-      >
+      <div className="rm-row">
         {steps.map((step) => (
           <div
             key={step.title}
