@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { createRide, fetchRides, joinRide, type Ride } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
 
@@ -14,8 +14,9 @@ const emptyForm = {
 };
 
 export default function RidesPage() {
-  const { user } = useAuth();
+  const { user, token } = useAuth();
   const location = useLocation();
+  const navigate = useNavigate();
   const [rides, setRides] = useState<Ride[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -42,11 +43,11 @@ export default function RidesPage() {
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
-    if (!user) return;
+    if (!user || !token) return;
     setSubmitting(true);
     setError(null);
     try {
-      await createRide({ ...form, driverName: user.name });
+      await createRide(form, token);
       setForm(emptyForm);
       loadRides();
     } catch (err) {
@@ -57,9 +58,13 @@ export default function RidesPage() {
   }
 
   async function handleJoin(id: string) {
+    if (!token) {
+      navigate("/login", { state: { from: "/rides#browse" } });
+      return;
+    }
     setError(null);
     try {
-      await joinRide(id);
+      await joinRide(id, token);
       loadRides();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to join ride.");
@@ -252,9 +257,10 @@ export default function RidesPage() {
                     borderRadius: 24,
                     fontWeight: 700,
                     cursor: full ? "not-allowed" : "pointer",
+                    whiteSpace: "nowrap",
                   }}
                 >
-                  {full ? "Full" : "Join"}
+                  {full ? "Full" : user ? "Join" : "Log in to join"}
                 </button>
               </div>
             );
