@@ -1,6 +1,7 @@
-export default function Testimonials(){
+import { useEffect, useState } from "react";
+import { fetchTestimonials, type Testimonial } from "../../lib/api";
 
-const reviews=[
+const fallbackReviews: Testimonial[] = [
 
 {
 name:"Ayesha Rahman",
@@ -18,6 +19,16 @@ text:"Women-only rides made my daily commute much safer."
 }
 
 ];
+
+export default function Testimonials(){
+
+const [reviews, setReviews] = useState<Testimonial[]>(fallbackReviews);
+
+useEffect(() => {
+  fetchTestimonials()
+    .then((data) => setReviews(data.testimonials))
+    .catch(() => setReviews(fallbackReviews));
+}, []);
 
 return(
 
