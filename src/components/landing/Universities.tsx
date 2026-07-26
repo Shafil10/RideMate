@@ -1,6 +1,7 @@
-export default function Universities() {
+import { useEffect, useState } from "react";
+import { fetchUniversities } from "../../lib/api";
 
-const universities=[
+const fallbackUniversities = [
 "North South University",
 "BRAC University",
 "AIUB",
@@ -10,6 +11,16 @@ const universities=[
 "DIU",
 "IUB"
 ];
+
+export default function Universities() {
+
+const [universities, setUniversities] = useState<string[]>(fallbackUniversities);
+
+useEffect(() => {
+  fetchUniversities()
+    .then((data) => setUniversities(data.universities))
+    .catch(() => setUniversities(fallbackUniversities));
+}, []);
 
 return(
 

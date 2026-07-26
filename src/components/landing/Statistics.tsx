@@ -1,10 +1,21 @@
+import { useEffect, useState } from "react";
+import { fetchStats, type Stat } from "../../lib/api";
+
+const fallbackStats: Stat[] = [
+  { value: "4.5M+", label: "University Students" },
+  { value: "40+", label: "Partner Universities" },
+  { value: "30%", label: "Average Cost Saved" },
+  { value: "95%", label: "AI Route Match" },
+];
+
 export default function Statistics() {
-  const stats = [
-    { value: "4.5M+", label: "University Students" },
-    { value: "40+", label: "Partner Universities" },
-    { value: "30%", label: "Average Cost Saved" },
-    { value: "95%", label: "AI Route Match" },
-  ];
+  const [stats, setStats] = useState<Stat[]>(fallbackStats);
+
+  useEffect(() => {
+    fetchStats()
+      .then((data) => setStats(data.stats))
+      .catch(() => setStats(fallbackStats));
+  }, []);
 
   return (
     <section
