@@ -88,10 +88,8 @@ export default function RidesPage() {
         {user ? (
           <form
             onSubmit={handleCreate}
+            className="ride-form-grid"
             style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(2, 1fr)",
-              gap: 12,
               background: "#f9fafb",
               padding: 24,
               borderRadius: 16,
@@ -225,13 +223,11 @@ export default function RidesPage() {
             return (
               <div
                 key={ride.id}
+                className="ride-card"
                 style={{
                   border: "1px solid #ececec",
                   borderRadius: 12,
                   padding: 20,
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
                 }}
               >
                 <div>

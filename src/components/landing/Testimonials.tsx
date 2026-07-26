@@ -22,30 +22,19 @@ text:"Women-only rides made my daily commute much safer."
 return(
 
 <section
+className="rm-section"
 style={{
-padding:"100px",
 background:"white"
 }}
 >
 
-<h1
-style={{
-textAlign:"center",
-fontSize:"48px",
-marginBottom:"60px"
-}}
->
+<h1 className="rm-heading">
 
 What Students Say
 
 </h1>
 
-<div
-style={{
-display:"flex",
-gap:"30px"
-}}
->
+<div className="rm-row">
 
 {reviews.map((r)=>(
 <div

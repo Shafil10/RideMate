@@ -52,11 +52,11 @@ export default function ChatboxWidget() {
   }
 
   return (
-    <div style={{ position: "fixed", bottom: 24, right: 24, zIndex: 1000 }}>
+    <div className="chatbox-widget" style={{ position: "fixed", bottom: 24, right: 24, zIndex: 1000 }}>
       {open && (
         <div
+          className="chatbox-panel"
           style={{
-            width: 340,
             height: 460,
             background: "white",
             borderRadius: 16,

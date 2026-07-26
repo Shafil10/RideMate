@@ -5,26 +5,16 @@ export default function AppPreview(){
 return(
 
 <section
+className="rm-section"
 style={{
-padding:"120px",
 background:
 "linear-gradient(135deg,#ecfdf5,#dcfce7)"
 }}
 >
 
-<div
-style={{
-display:"flex",
-alignItems:"center",
-justifyContent:"space-between"
-}}
->
+<div className="app-preview-row">
 
-<div
-style={{
-width:"45%"
-}}
->
+<div className="app-preview-copy">
 
 <h1
 style={{
@@ -70,9 +60,8 @@ Coming Soon
 </div>
 
 <div
+className="app-preview-phone"
 style={{
-width:"340px",
-height:"650px",
 background:"white",
 borderRadius:"45px",
 boxShadow:"0 30px 60px rgba(0,0,0,.12)",

@@ -3,19 +3,14 @@ export default function Footer(){
 return(
 
 <footer
+className="rm-section"
 style={{
 background:"#111827",
-color:"white",
-padding:"70px 100px"
+color:"white"
 }}
 >
 
-<div
-style={{
-display:"flex",
-justifyContent:"space-between"
-}}
->
+<div className="footer-row">
 
 <div>
 

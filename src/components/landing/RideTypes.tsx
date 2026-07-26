@@ -3,27 +3,16 @@ import { CarTaxiFront, CarFront } from "lucide-react";
 export default function RideTypes() {
   return (
     <section
+      className="rm-section"
       style={{
-        padding: "100px",
         background: "#f8fafc",
       }}
     >
-      <h1
-        style={{
-          textAlign: "center",
-          fontSize: "48px",
-          marginBottom: "60px",
-        }}
-      >
+      <h1 className="rm-heading">
         Two Ways to Ride
       </h1>
 
-      <div
-        style={{
-          display: "flex",
-          gap: "40px",
-        }}
-      >
+      <div className="rm-row">
         <div
           style={{
             flex: 1,
