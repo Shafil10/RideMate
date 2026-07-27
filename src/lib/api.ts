@@ -10,7 +10,8 @@ export interface Ride {
   farePerSeat: number;
   driverName: string;
   createdAt: string;
-  myBooking: { id: string; pickupPoint: string } | null;
+  myBooking: { id: string; pickupPoint: string; pickupLat: number | null; pickupLng: number | null } | null;
+  isFavorited: boolean;
 }
 
 export interface NewRideInput {
@@ -48,12 +49,25 @@ export function createRide(input: NewRideInput, token: string): Promise<{ ride: 
   return request("/rides", { method: "POST", body: JSON.stringify(input) }, token);
 }
 
-export function joinRide(id: string, pickupPoint: string, token: string): Promise<{ ride: Ride }> {
-  return request(`/rides/${id}/join`, { method: "POST", body: JSON.stringify({ pickupPoint }) }, token);
+export function joinRide(
+  id: string,
+  pickupPoint: string,
+  token: string,
+  location?: { lat: number; lng: number } | null,
+): Promise<{ ride: Ride }> {
+  return request(
+    `/rides/${id}/join`,
+    { method: "POST", body: JSON.stringify({ pickupPoint, pickupLat: location?.lat, pickupLng: location?.lng }) },
+    token,
+  );
 }
 
 export function cancelBooking(id: string, token: string): Promise<{ ride: Ride; cancellationFee: number }> {
   return request(`/rides/${id}/cancel`, { method: "POST" }, token);
+}
+
+export function toggleFavorite(id: string, token: string): Promise<{ isFavorited: boolean }> {
+  return request(`/rides/${id}/favorite`, { method: "POST" }, token);
 }
 
 export function sendChatMessage(message: string, token?: string | null): Promise<{ reply: string; topicId: string }> {
