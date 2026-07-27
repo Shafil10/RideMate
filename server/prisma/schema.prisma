@@ -19,6 +19,7 @@ model User {
   rides        Ride[]
   chatMessages ChatMessage[]
   bookings     Booking[]
+  favorites    Favorite[]
 }
 
 model Ride {
@@ -36,12 +37,15 @@ model Ride {
   driver   User   @relation(fields: [driverId], references: [id])
   driverId String
 
-  bookings Booking[]
+  bookings  Booking[]
+  favorites Favorite[]
 }
 
 model Booking {
   id              String    @id @default(cuid())
   pickupPoint     String
+  pickupLat       Float?
+  pickupLng       Float?
   status          String    @default("confirmed") // "confirmed" | "cancelled"
   cancellationFee Int?
   createdAt       DateTime  @default(now())
@@ -52,6 +56,19 @@ model Booking {
 
   rider   User   @relation(fields: [riderId], references: [id])
   riderId String
+}
+
+model Favorite {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+
+  ride   Ride   @relation(fields: [rideId], references: [id])
+  rideId String
+
+  user   User   @relation(fields: [userId], references: [id])
+  userId String
+
+  @@unique([userId, rideId])
 }
 
 model ChatMessage {

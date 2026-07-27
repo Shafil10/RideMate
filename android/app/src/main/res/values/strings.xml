@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">RideMate</string>
+    <string name="title_activity_main">RideMate</string>
+    <string name="package_name">com.ridemate.app</string>
+    <string name="custom_url_scheme">com.ridemate.app</string>
+</resources>

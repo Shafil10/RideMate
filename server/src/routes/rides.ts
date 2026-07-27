@@ -20,7 +20,8 @@ function serializeRide(
     createdAt: Date;
     driver: { name: string };
   },
-  myBooking?: { id: string; pickupPoint: string } | null,
+  myBooking?: { id: string; pickupPoint: string; pickupLat: number | null; pickupLng: number | null } | null,
+  isFavorited = false,
 ) {
   return {
     id: ride.id,
@@ -35,6 +36,7 @@ function serializeRide(
     driverName: ride.driver.name,
     createdAt: ride.createdAt.toISOString(),
     myBooking: myBooking ?? null,
+    isFavorited,
   };
 }
 
@@ -42,7 +44,11 @@ router.get("/", optionalAuth, async (req, res) => {
   const rides = await prisma.ride.findMany({
     include: {
       driver: { select: { name: true } },
-      bookings: { where: { status: "confirmed" }, select: { id: true, pickupPoint: true, riderId: true } },
+      bookings: {
+        where: { status: "confirmed" },
+        select: { id: true, pickupPoint: true, pickupLat: true, pickupLng: true, riderId: true },
+      },
+      favorites: req.user ? { where: { userId: req.user.sub }, select: { id: true } } : false,
     },
     orderBy: { departureTime: "asc" },
   });
@@ -50,7 +56,8 @@ router.get("/", optionalAuth, async (req, res) => {
   res.json({
     rides: rides.map((ride) => {
       const myBooking = req.user ? ride.bookings.find((b) => b.riderId === req.user!.sub) : undefined;
-      return serializeRide(ride, myBooking);
+      const isFavorited = "favorites" in ride ? ride.favorites.length > 0 : false;
+      return serializeRide(ride, myBooking, isFavorited);
     }),
   });
 });
@@ -80,7 +87,7 @@ router.post("/", requireAuth, async (req, res) => {
 });
 
 router.post("/:id/join", requireAuth, async (req, res) => {
-  const { pickupPoint } = req.body ?? {};
+  const { pickupPoint, pickupLat, pickupLng } = req.body ?? {};
 
   if (!pickupPoint || !String(pickupPoint).trim()) {
     return res.status(400).json({ error: "A pickup point on the ride's route is required." });
@@ -106,7 +113,13 @@ router.post("/:id/join", requireAuth, async (req, res) => {
 
   const [booking, updated] = await prisma.$transaction([
     prisma.booking.create({
-      data: { rideId: ride.id, riderId: req.user!.sub, pickupPoint: String(pickupPoint).trim() },
+      data: {
+        rideId: ride.id,
+        riderId: req.user!.sub,
+        pickupPoint: String(pickupPoint).trim(),
+        pickupLat: typeof pickupLat === "number" ? pickupLat : null,
+        pickupLng: typeof pickupLng === "number" ? pickupLng : null,
+      },
     }),
     prisma.ride.update({
       where: { id: ride.id },
@@ -115,7 +128,14 @@ router.post("/:id/join", requireAuth, async (req, res) => {
     }),
   ]);
 
-  res.json({ ride: serializeRide(updated, { id: booking.id, pickupPoint: booking.pickupPoint }) });
+  res.json({
+    ride: serializeRide(updated, {
+      id: booking.id,
+      pickupPoint: booking.pickupPoint,
+      pickupLat: booking.pickupLat,
+      pickupLng: booking.pickupLng,
+    }),
+  });
 });
 
 router.post("/:id/cancel", requireAuth, async (req, res) => {
@@ -140,6 +160,25 @@ router.post("/:id/cancel", requireAuth, async (req, res) => {
   ]);
 
   res.json({ ride: serializeRide(updated, null), cancellationFee: CANCELLATION_FEE });
+});
+
+router.post("/:id/favorite", requireAuth, async (req, res) => {
+  const existing = await prisma.favorite.findUnique({
+    where: { userId_rideId: { userId: req.user!.sub, rideId: req.params.id } },
+  });
+
+  if (existing) {
+    await prisma.favorite.delete({ where: { id: existing.id } });
+    return res.json({ isFavorited: false });
+  }
+
+  const ride = await prisma.ride.findUnique({ where: { id: req.params.id } });
+  if (!ride) {
+    return res.status(404).json({ error: "Ride not found." });
+  }
+
+  await prisma.favorite.create({ data: { userId: req.user!.sub, rideId: req.params.id } });
+  res.json({ isFavorited: true });
 });
 
 export default router;

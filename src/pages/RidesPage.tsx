@@ -1,9 +1,22 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { cancelBooking, createRide, fetchRides, joinRide, type Ride } from "../lib/api";
+import { cancelBooking, createRide, fetchRides, joinRide, toggleFavorite, type Ride } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
+import PickupMapPicker, { type LatLng } from "../components/rides/PickupMapPicker";
 
 const CANCELLATION_FEE = 50;
+
+function timeOfDayMinutes(iso: string): number {
+  const d = new Date(iso);
+  return d.getHours() * 60 + d.getMinutes();
+}
+
+function timeStringToMinutes(t: string): number | null {
+  if (!t) return null;
+  const [h, m] = t.split(":").map(Number);
+  if (Number.isNaN(h) || Number.isNaN(m)) return null;
+  return h * 60 + m;
+}
 
 const emptyForm = {
   type: "student-driver" as Ride["type"],
@@ -27,7 +40,12 @@ export default function RidesPage() {
   const [submitting, setSubmitting] = useState(false);
   const [joiningRideId, setJoiningRideId] = useState<string | null>(null);
   const [pickupPoint, setPickupPoint] = useState("");
+  const [pickupLocation, setPickupLocation] = useState<LatLng | null>(null);
   const [busyRideId, setBusyRideId] = useState<string | null>(null);
+  const [favBusyId, setFavBusyId] = useState<string | null>(null);
+  const [timeFrom, setTimeFrom] = useState("");
+  const [timeTo, setTimeTo] = useState("");
+  const [favoritesOnly, setFavoritesOnly] = useState(false);
 
   function loadRides() {
     setLoading(true);
@@ -72,6 +90,7 @@ export default function RidesPage() {
     setError(null);
     setNotice(null);
     setPickupPoint("");
+    setPickupLocation(null);
     setJoiningRideId(id);
   }
 
@@ -83,15 +102,32 @@ export default function RidesPage() {
     setBusyRideId(id);
     setError(null);
     try {
-      await joinRide(id, pickupPoint.trim(), token);
+      await joinRide(id, pickupPoint.trim(), token, pickupLocation);
       setJoiningRideId(null);
       setPickupPoint("");
+      setPickupLocation(null);
       setNotice("Seat reserved. See you at the pickup point!");
       loadRides();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to join ride.");
     } finally {
       setBusyRideId(null);
+    }
+  }
+
+  async function handleToggleFavorite(id: string) {
+    if (!token) {
+      navigate("/login", { state: { from: "/rides#browse" } });
+      return;
+    }
+    setFavBusyId(id);
+    try {
+      const { isFavorited } = await toggleFavorite(id, token);
+      setRides((prev) => prev.map((r) => (r.id === id ? { ...r, isFavorited } : r)));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to update favorite.");
+    } finally {
+      setFavBusyId(null);
     }
   }
 
@@ -114,6 +150,21 @@ export default function RidesPage() {
       setBusyRideId(null);
     }
   }
+
+  const visibleRides = useMemo(() => {
+    const fromMin = timeStringToMinutes(timeFrom);
+    const toMin = timeStringToMinutes(timeTo);
+    return rides.filter((ride) => {
+      if (favoritesOnly && !ride.isFavorited) return false;
+      if (fromMin === null && toMin === null) return true;
+      const rideMin = timeOfDayMinutes(ride.departureTime);
+      if (fromMin !== null && toMin !== null) {
+        return fromMin <= toMin ? rideMin >= fromMin && rideMin <= toMin : rideMin >= fromMin || rideMin <= toMin;
+      }
+      if (fromMin !== null) return rideMin >= fromMin;
+      return rideMin <= (toMin as number);
+    });
+  }, [rides, timeFrom, timeTo, favoritesOnly]);
 
   return (
     <div style={{ maxWidth: 960, margin: "0 auto", padding: "120px 24px 80px" }}>
@@ -264,11 +315,51 @@ export default function RidesPage() {
         Available Rides
       </h2>
 
+      <div
+        style={{
+          display: "flex",
+          gap: 16,
+          flexWrap: "wrap",
+          alignItems: "flex-end",
+          background: "#f9fafb",
+          padding: "16px 20px",
+          borderRadius: 12,
+          marginBottom: 20,
+        }}
+      >
+        <label style={{ display: "grid", gap: 4, fontSize: 12.5, fontWeight: 600, color: "#555" }}>
+          Departing after
+          <input type="time" value={timeFrom} onChange={(e) => setTimeFrom(e.target.value)} style={inputStyle} />
+        </label>
+        <label style={{ display: "grid", gap: 4, fontSize: 12.5, fontWeight: 600, color: "#555" }}>
+          Departing before
+          <input type="time" value={timeTo} onChange={(e) => setTimeTo(e.target.value)} style={inputStyle} />
+        </label>
+        {(timeFrom || timeTo) && (
+          <button
+            onClick={() => {
+              setTimeFrom("");
+              setTimeTo("");
+            }}
+            style={{ background: "none", border: "1px solid #d1d5db", borderRadius: 20, padding: "9px 16px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}
+          >
+            Clear time filter
+          </button>
+        )}
+        <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13.5, fontWeight: 600, color: "#555", marginBottom: 2 }}>
+          <input type="checkbox" checked={favoritesOnly} onChange={(e) => setFavoritesOnly(e.target.checked)} />
+          ★ Favorites only
+        </label>
+        <span style={{ fontSize: 12.5, color: "#8b968f", marginBottom: 2 }}>
+          Showing {visibleRides.length} of {rides.length} rides
+        </span>
+      </div>
+
       {loading ? (
         <p>Loading rides...</p>
       ) : (
         <div style={{ display: "grid", gap: 16 }}>
-          {rides.map((ride) => {
+          {visibleRides.map((ride) => {
             const full = ride.seatsTaken >= ride.seatsTotal;
             const busy = busyRideId === ride.id;
             return (
@@ -285,7 +376,24 @@ export default function RidesPage() {
               >
                 <div className="ride-card" style={{ padding: 0, border: "none" }}>
                   <div>
-                    <div style={{ fontWeight: 700 }}>
+                    <div style={{ fontWeight: 700, display: "flex", alignItems: "center", gap: 8 }}>
+                      <button
+                        onClick={() => handleToggleFavorite(ride.id)}
+                        disabled={favBusyId === ride.id}
+                        aria-label={ride.isFavorited ? "Remove from favorites" : "Add to favorites"}
+                        title={ride.isFavorited ? "Remove from favorites" : "Add to favorites"}
+                        style={{
+                          background: "none",
+                          border: "none",
+                          cursor: "pointer",
+                          fontSize: 18,
+                          lineHeight: 1,
+                          padding: 0,
+                          color: ride.isFavorited ? "#f59e0b" : "#d1d5db",
+                        }}
+                      >
+                        {ride.isFavorited ? "★" : "☆"}
+                      </button>
                       {ride.origin} → {ride.destination}
                     </div>
                     <div style={{ color: "#555", fontSize: 14 }}>
@@ -346,44 +454,47 @@ export default function RidesPage() {
                       paddingTop: 16,
                       borderTop: "1px solid #ececec",
                       display: "flex",
-                      gap: 10,
-                      flexWrap: "wrap",
-                      alignItems: "center",
+                      flexDirection: "column",
+                      gap: 12,
                     }}
                   >
-                    <input
-                      autoFocus
-                      placeholder="Pickup point on this route (e.g. Mirpur 10 main road)"
-                      value={pickupPoint}
-                      onChange={(e) => setPickupPoint(e.target.value)}
-                      style={{ ...inputStyle, flex: "1 1 260px" }}
-                    />
-                    <button
-                      onClick={() => handleConfirmJoin(ride.id)}
-                      disabled={busy}
-                      style={{
-                        background: "#16a34a",
-                        color: "white",
-                        border: "none",
-                        padding: "10px 20px",
-                        borderRadius: 24,
-                        fontWeight: 700,
-                        cursor: busy ? "default" : "pointer",
-                        whiteSpace: "nowrap",
-                      }}
-                    >
-                      {busy ? "Confirming..." : "Confirm seat"}
-                    </button>
-                    <button
-                      onClick={() => {
-                        setJoiningRideId(null);
-                        setPickupPoint("");
-                      }}
-                      style={{
-                        background: "none",
-                        border: "1px solid #d1d5db",
-                        padding: "10px 20px",
-                        borderRadius: 24,
+                    <PickupMapPicker value={pickupLocation} onChange={setPickupLocation} />
+
+                    <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+                      <input
+                        autoFocus
+                        placeholder="Pickup point label (e.g. Mirpur 10 main road)"
+                        value={pickupPoint}
+                        onChange={(e) => setPickupPoint(e.target.value)}
+                        style={{ ...inputStyle, flex: "1 1 260px" }}
+                      />
+                      <button
+                        onClick={() => handleConfirmJoin(ride.id)}
+                        disabled={busy}
+                        style={{
+                          background: "#16a34a",
+                          color: "white",
+                          border: "none",
+                          padding: "10px 20px",
+                          borderRadius: 24,
+                          fontWeight: 700,
+                          cursor: busy ? "default" : "pointer",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        {busy ? "Confirming..." : "Confirm seat"}
+                      </button>
+                      <button
+                        onClick={() => {
+                          setJoiningRideId(null);
+                          setPickupPoint("");
+                          setPickupLocation(null);
+                        }}
+                        style={{
+                          background: "none",
+                          border: "1px solid #d1d5db",
+                          padding: "10px 20px",
+                          borderRadius: 24,
                         fontWeight: 600,
                         cursor: "pointer",
                         whiteSpace: "nowrap",
@@ -391,12 +502,19 @@ export default function RidesPage() {
                     >
                       Dismiss
                     </button>
+                    </div>
                   </div>
                 )}
               </div>
             );
           })}
         </div>
+      )}
+
+      {!loading && rides.length > 0 && visibleRides.length === 0 && (
+        <p style={{ color: "#8b968f", textAlign: "center", marginTop: 24 }}>
+          No rides match your filters right now. Try widening the time range or turning off "Favorites only".
+        </p>
       )}
     </div>
   );
