@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { createRide, fetchRides, joinRide, type Ride } from "../lib/api";
+import { useAuth } from "../context/AuthContext";
 
 const emptyForm = {
   type: "student-driver" as Ride["type"],
@@ -9,10 +11,12 @@ const emptyForm = {
   departureTime: "",
   seatsTotal: 3,
   farePerSeat: 50,
-  driverName: "",
 };
 
 export default function RidesPage() {
+  const { user, token } = useAuth();
+  const location = useLocation();
+  const navigate = useNavigate();
   const [rides, setRides] = useState<Ride[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -31,12 +35,19 @@ export default function RidesPage() {
     loadRides();
   }, []);
 
+  useEffect(() => {
+    if (!location.hash) return;
+    const el = document.getElementById(location.hash.slice(1));
+    el?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [location.hash, loading]);
+
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
+    if (!user || !token) return;
     setSubmitting(true);
     setError(null);
     try {
-      await createRide(form);
+      await createRide(form, token);
       setForm(emptyForm);
       loadRides();
     } catch (err) {
@@ -47,9 +58,13 @@ export default function RidesPage() {
   }
 
   async function handleJoin(id: string) {
+    if (!token) {
+      navigate("/login", { state: { from: "/rides#browse" } });
+      return;
+    }
     setError(null);
     try {
-      await joinRide(id);
+      await joinRide(id, token);
       loadRides();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to join ride.");
@@ -69,106 +84,135 @@ export default function RidesPage() {
         </div>
       )}
 
-      <form
-        onSubmit={handleCreate}
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(2, 1fr)",
-          gap: 12,
-          background: "#f9fafb",
-          padding: 24,
-          borderRadius: 16,
-          marginBottom: 40,
-        }}
-      >
-        <h2 style={{ gridColumn: "1 / -1", fontSize: 20, margin: 0 }}>Create a Ride</h2>
+      <div id="create" style={{ scrollMarginTop: 100 }}>
+        {user ? (
+          <form
+            onSubmit={handleCreate}
+            className="ride-form-grid"
+            style={{
+              background: "#f9fafb",
+              padding: 24,
+              borderRadius: 16,
+              marginBottom: 40,
+            }}
+          >
+            <h2 style={{ gridColumn: "1 / -1", fontSize: 20, margin: 0 }}>Create a Ride</h2>
+            <p style={{ gridColumn: "1 / -1", margin: "-6px 0 4px", fontSize: 13, color: "#555" }}>
+              Creating as <strong>{user.name}</strong> ({user.university})
+            </p>
 
-        <select
-          value={form.type}
-          onChange={(e) => setForm({ ...form, type: e.target.value as Ride["type"] })}
-          style={inputStyle}
-        >
-          <option value="student-driver">Student Driver Ride</option>
-          <option value="shared-taxi">Shared Taxi Ride</option>
-        </select>
+            <select
+              value={form.type}
+              onChange={(e) => setForm({ ...form, type: e.target.value as Ride["type"] })}
+              style={inputStyle}
+            >
+              <option value="student-driver">Student Driver Ride</option>
+              <option value="shared-taxi">Shared Taxi Ride</option>
+            </select>
 
-        <input
-          placeholder="Driver / organizer name"
-          value={form.driverName}
-          onChange={(e) => setForm({ ...form, driverName: e.target.value })}
-          style={inputStyle}
-          required
-        />
+            <input
+              placeholder="Origin"
+              value={form.origin}
+              onChange={(e) => setForm({ ...form, origin: e.target.value })}
+              style={inputStyle}
+              required
+            />
 
-        <input
-          placeholder="Origin"
-          value={form.origin}
-          onChange={(e) => setForm({ ...form, origin: e.target.value })}
-          style={inputStyle}
-          required
-        />
+            <input
+              placeholder="Destination"
+              value={form.destination}
+              onChange={(e) => setForm({ ...form, destination: e.target.value })}
+              style={inputStyle}
+              required
+            />
 
-        <input
-          placeholder="Destination"
-          value={form.destination}
-          onChange={(e) => setForm({ ...form, destination: e.target.value })}
-          style={inputStyle}
-          required
-        />
+            <input
+              placeholder="University"
+              value={form.university}
+              onChange={(e) => setForm({ ...form, university: e.target.value })}
+              style={inputStyle}
+              required
+            />
 
-        <input
-          placeholder="University"
-          value={form.university}
-          onChange={(e) => setForm({ ...form, university: e.target.value })}
-          style={inputStyle}
-          required
-        />
+            <input
+              type="datetime-local"
+              value={form.departureTime}
+              onChange={(e) => setForm({ ...form, departureTime: e.target.value })}
+              style={inputStyle}
+              required
+            />
 
-        <input
-          type="datetime-local"
-          value={form.departureTime}
-          onChange={(e) => setForm({ ...form, departureTime: e.target.value })}
-          style={inputStyle}
-          required
-        />
+            <input
+              type="number"
+              min={1}
+              placeholder="Seats total"
+              value={form.seatsTotal}
+              onChange={(e) => setForm({ ...form, seatsTotal: Number(e.target.value) })}
+              style={inputStyle}
+            />
 
-        <input
-          type="number"
-          min={1}
-          placeholder="Seats total"
-          value={form.seatsTotal}
-          onChange={(e) => setForm({ ...form, seatsTotal: Number(e.target.value) })}
-          style={inputStyle}
-        />
+            <input
+              type="number"
+              min={0}
+              placeholder="Fare per seat (BDT)"
+              value={form.farePerSeat}
+              onChange={(e) => setForm({ ...form, farePerSeat: Number(e.target.value) })}
+              style={inputStyle}
+            />
 
-        <input
-          type="number"
-          min={0}
-          placeholder="Fare per seat (BDT)"
-          value={form.farePerSeat}
-          onChange={(e) => setForm({ ...form, farePerSeat: Number(e.target.value) })}
-          style={inputStyle}
-        />
+            <button
+              type="submit"
+              disabled={submitting}
+              style={{
+                gridColumn: "1 / -1",
+                background: "#16a34a",
+                color: "white",
+                border: "none",
+                padding: "12px 24px",
+                borderRadius: 30,
+                fontWeight: 700,
+                cursor: "pointer",
+              }}
+            >
+              {submitting ? "Creating..." : "Create Ride"}
+            </button>
+          </form>
+        ) : (
+          <div
+            style={{
+              background: "#f9fafb",
+              padding: 24,
+              borderRadius: 16,
+              marginBottom: 40,
+              textAlign: "center",
+            }}
+          >
+            <h2 style={{ fontSize: 20, marginBottom: 8 }}>Log in to create a ride</h2>
+            <p style={{ color: "#555", marginBottom: 16, fontSize: 14 }}>
+              We use your account so other students know who's driving.
+            </p>
+            <Link
+              to="/login"
+              state={{ from: "/rides#create" }}
+              style={{
+                display: "inline-block",
+                background: "#16a34a",
+                color: "white",
+                padding: "12px 24px",
+                borderRadius: 30,
+                fontWeight: 700,
+                textDecoration: "none",
+              }}
+            >
+              Log in
+            </Link>
+          </div>
+        )}
+      </div>
 
-        <button
-          type="submit"
-          disabled={submitting}
-          style={{
-            gridColumn: "1 / -1",
-            background: "#16a34a",
-            color: "white",
-            border: "none",
-            padding: "12px 24px",
-            borderRadius: 30,
-            fontWeight: 700,
-            cursor: "pointer",
-          }}
-        >
-          {submitting ? "Creating..." : "Create Ride"}
-        </button>
-      </form>
-
-      <h2 style={{ fontSize: 20, marginBottom: 16 }}>Available Rides</h2>
+      <h2 id="browse" style={{ fontSize: 20, marginBottom: 16, scrollMarginTop: 100 }}>
+        Available Rides
+      </h2>
 
       {loading ? (
         <p>Loading rides...</p>
@@ -179,13 +223,11 @@ export default function RidesPage() {
             return (
               <div
                 key={ride.id}
+                className="ride-card"
                 style={{
                   border: "1px solid #ececec",
                   borderRadius: 12,
                   padding: 20,
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
                 }}
               >
                 <div>
@@ -211,9 +253,10 @@ export default function RidesPage() {
                     borderRadius: 24,
                     fontWeight: 700,
                     cursor: full ? "not-allowed" : "pointer",
+                    whiteSpace: "nowrap",
                   }}
                 >
-                  {full ? "Full" : "Join"}
+                  {full ? "Full" : user ? "Join" : "Log in to join"}
                 </button>
               </div>
             );

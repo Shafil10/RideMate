@@ -23,30 +23,19 @@ text:"Fewer cars around campus means smoother commutes."
 return(
 
 <section
+className="rm-section"
 style={{
-padding:"100px",
 background:"#f8fafc"
 }}
 >
 
-<h1
-style={{
-textAlign:"center",
-fontSize:"48px",
-marginBottom:"60px"
-}}
->
+<h1 className="rm-heading">
 
 Sustainability Matters
 
 </h1>
 
-<div
-style={{
-display:"flex",
-gap:"30px"
-}}
->
+<div className="rm-row">
 
 {cards.map((c)=>(
 <div

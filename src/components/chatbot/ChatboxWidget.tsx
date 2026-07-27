@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { MessageCircle, X, Send } from "lucide-react";
 import { sendChatMessage } from "../../lib/api";
+import { useAuth } from "../../context/AuthContext";
 
 interface ChatMessage {
   id: number;
@@ -17,6 +18,7 @@ const welcomeMessage: ChatMessage = {
 };
 
 export default function ChatboxWidget() {
+  const { token } = useAuth();
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([welcomeMessage]);
   const [input, setInput] = useState("");
@@ -37,7 +39,7 @@ export default function ChatboxWidget() {
     setSending(true);
 
     try {
-      const { reply } = await sendChatMessage(text);
+      const { reply } = await sendChatMessage(text, token);
       setMessages((prev) => [...prev, { id: nextId++, sender: "bot", text: reply }]);
     } catch {
       setMessages((prev) => [
@@ -50,11 +52,11 @@ export default function ChatboxWidget() {
   }
 
   return (
-    <div style={{ position: "fixed", bottom: 24, right: 24, zIndex: 1000 }}>
+    <div className="chatbox-widget" style={{ position: "fixed", bottom: 24, right: 24, zIndex: 1000 }}>
       {open && (
         <div
+          className="chatbox-panel"
           style={{
-            width: 340,
             height: 460,
             background: "white",
             borderRadius: 16,

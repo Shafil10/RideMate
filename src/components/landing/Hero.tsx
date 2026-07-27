@@ -1,25 +1,35 @@
 import { CarFront, Users, Leaf, Sparkles } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "../../context/AuthContext";
 
 export default function Hero() {
+  const { user } = useAuth();
+  const navigate = useNavigate();
+
+  function handleCreateCommute() {
+    if (user) {
+      navigate("/rides#create");
+    } else {
+      navigate("/login", { state: { from: "/rides#create" } });
+    }
+  }
+
+  function handleExploreRides() {
+    navigate("/rides#browse");
+  }
+
   return (
     <section
+      className="hero-section"
       style={{
         minHeight: "100vh",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-        padding: "120px 100px",
         background:
           "linear-gradient(to bottom right,#ecfdf5,#ffffff,#dcfce7)",
       }}
     >
       {/* LEFT */}
 
-      <div
-        style={{
-          width: "50%",
-        }}
-      >
+      <div className="hero-left">
         <div
           style={{
             display: "inline-block",
@@ -35,9 +45,8 @@ export default function Hero() {
         </div>
 
         <h1
+          className="hero-title"
           style={{
-            fontSize: "70px",
-            lineHeight: "80px",
             margin: 0,
           }}
         >
@@ -52,7 +61,7 @@ export default function Hero() {
             fontSize: "22px",
             lineHeight: "36px",
             marginTop: 25,
-            width: "85%",
+            maxWidth: 520,
           }}
         >
           RideMate helps university students create or join planned
@@ -60,14 +69,9 @@ export default function Hero() {
           greener campus communities.
         </p>
 
-        <div
-          style={{
-            display: "flex",
-            gap: "20px",
-            marginTop: 40,
-          }}
-        >
+        <div className="hero-buttons" style={{ marginTop: 40 }}>
           <button
+            onClick={handleCreateCommute}
             style={{
               padding: "18px 36px",
               background: "#16a34a",
@@ -82,6 +86,7 @@ export default function Hero() {
           </button>
 
           <button
+            onClick={handleExploreRides}
             style={{
               padding: "18px 36px",
               background: "white",
@@ -96,13 +101,7 @@ export default function Hero() {
           </button>
         </div>
 
-        <div
-          style={{
-            display: "flex",
-            gap: "40px",
-            marginTop: 60,
-          }}
-        >
+        <div className="hero-stats" style={{ marginTop: 60 }}>
           <div>
             <h2 style={{ color: "#16a34a", margin: 0 }}>40+</h2>
             <p>Universities</p>
@@ -122,17 +121,10 @@ export default function Hero() {
 
       {/* RIGHT */}
 
-      <div
-        style={{
-          width: "42%",
-          display: "flex",
-          justifyContent: "center",
-        }}
-      >
+      <div className="hero-right">
         <div
+          className="hero-preview-card"
           style={{
-            width: "520px",
-            height: "620px",
             background: "white",
             borderRadius: "35px",
             boxShadow: "0 30px 60px rgba(0,0,0,.12)",

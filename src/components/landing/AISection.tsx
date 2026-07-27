@@ -12,30 +12,18 @@ export default function AISection() {
 
   return (
     <section
+      className="rm-section"
       style={{
-        padding: "100px",
         background:
           "linear-gradient(135deg,#16a34a,#22c55e)",
         color: "white",
       }}
     >
-      <h1
-        style={{
-          textAlign: "center",
-          fontSize: "48px",
-          marginBottom: "70px",
-        }}
-      >
+      <h1 className="rm-heading">
         AI Powered RideMate
       </h1>
 
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(3,1fr)",
-          gap: "25px",
-        }}
-      >
+      <div className="rm-grid-3">
         {features.map((item) => (
           <div
             key={item}
