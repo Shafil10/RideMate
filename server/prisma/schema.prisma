@@ -18,6 +18,7 @@ model User {
 
   rides        Ride[]
   chatMessages ChatMessage[]
+  bookings     Booking[]
 }
 
 model Ride {
@@ -25,6 +26,7 @@ model Ride {
   type          String
   origin        String
   destination   String
+  pickupPoint   String?
   university    String
   departureTime DateTime
   seatsTotal    Int
@@ -34,6 +36,21 @@ model Ride {
 
   driver   User   @relation(fields: [driverId], references: [id])
   driverId String
+
+  bookings Booking[]
+}
+
+model Booking {
+  id        String   @id @default(cuid())
+  seats     Int
+  pricePaid Int
+  createdAt DateTime @default(now())
+
+  ride   Ride   @relation(fields: [rideId], references: [id])
+  rideId String
+
+  rider   User   @relation(fields: [riderId], references: [id])
+  riderId String
 }
 
 model ChatMessage {

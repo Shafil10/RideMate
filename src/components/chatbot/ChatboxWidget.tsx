@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { MessageCircle, X, Send } from "lucide-react";
-import { sendChatMessage } from "../../lib/api";
+import { fetchChatbotSuggestions, sendChatMessage } from "../../lib/api";
 import { useAuth } from "../../context/AuthContext";
 
 interface ChatMessage {
@@ -14,8 +14,15 @@ let nextId = 1;
 const welcomeMessage: ChatMessage = {
   id: 0,
   sender: "bot",
-  text: "Hi! I'm the RideMate Helpline bot. Ask me about creating rides, joining rides, fares, safety, or supported universities.",
+  text: "Hi! I'm the RideMate Helpline bot. Ask me about creating rides, joining rides, pickup points, fares, purchase history, safety, or supported universities.",
 };
+
+const defaultSuggestions = [
+  "How do I create a ride?",
+  "How do I join a ride?",
+  "What is a pickup point?",
+  "Where can I see my purchase history?",
+];
 
 export default function ChatboxWidget() {
   const { token } = useAuth();
@@ -23,24 +30,31 @@ export default function ChatboxWidget() {
   const [messages, setMessages] = useState<ChatMessage[]>([welcomeMessage]);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
+  const [suggestions, setSuggestions] = useState<string[]>(defaultSuggestions);
   const bodyRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     bodyRef.current?.scrollTo({ top: bodyRef.current.scrollHeight, behavior: "smooth" });
   }, [messages, open]);
 
-  async function handleSend(e: React.FormEvent) {
-    e.preventDefault();
-    const text = input.trim();
+  useEffect(() => {
+    fetchChatbotSuggestions()
+      .then((data) => setSuggestions(data.suggestions))
+      .catch(() => {});
+  }, []);
+
+  async function sendText(text: string) {
     if (!text || sending) return;
 
     setMessages((prev) => [...prev, { id: nextId++, sender: "user", text }]);
     setInput("");
     setSending(true);
+    setSuggestions([]);
 
     try {
-      const { reply } = await sendChatMessage(text, token);
+      const { reply, suggestions: nextSuggestions } = await sendChatMessage(text, token);
       setMessages((prev) => [...prev, { id: nextId++, sender: "bot", text: reply }]);
+      setSuggestions(nextSuggestions.length > 0 ? nextSuggestions : defaultSuggestions);
     } catch {
       setMessages((prev) => [
         ...prev,
@@ -49,6 +63,11 @@ export default function ChatboxWidget() {
     } finally {
       setSending(false);
     }
+  }
+
+  function handleSend(e: React.FormEvent) {
+    e.preventDefault();
+    sendText(input.trim());
   }
 
   return (
@@ -111,6 +130,41 @@ export default function ChatboxWidget() {
               <div style={{ alignSelf: "flex-start", color: "#9ca3af", fontSize: 13 }}>Helpline is typing...</div>
             )}
           </div>
+
+          {suggestions.length > 0 && !sending && (
+            <div
+              style={{
+                display: "flex",
+                gap: 8,
+                padding: "0 12px 10px",
+                overflowX: "auto",
+                borderTop: "1px solid #ececec",
+                paddingTop: 10,
+              }}
+            >
+              {suggestions.map((s) => (
+                <button
+                  key={s}
+                  type="button"
+                  onClick={() => sendText(s)}
+                  style={{
+                    flexShrink: 0,
+                    background: "#f3f4f6",
+                    color: "#16a34a",
+                    border: "1px solid #d1fae5",
+                    borderRadius: 20,
+                    padding: "6px 12px",
+                    fontSize: 12,
+                    fontWeight: 600,
+                    cursor: "pointer",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {s}
+                </button>
+              ))}
+            </div>
+          )}
 
           <form onSubmit={handleSend} style={{ display: "flex", borderTop: "1px solid #ececec", padding: 8, gap: 8 }}>
             <input

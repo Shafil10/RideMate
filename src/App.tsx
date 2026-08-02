@@ -4,6 +4,7 @@ import Navbar from "./components/layout/Navbar";
 import LandingPage from "./pages/LandingPage";
 import RidesPage from "./pages/RidesPage";
 import LoginPage from "./pages/LoginPage";
+import HistoryPage from "./pages/HistoryPage";
 import ChatboxWidget from "./components/chatbot/ChatboxWidget";
 
 function App() {
@@ -14,6 +15,7 @@ function App() {
         <Route path="/" element={<LandingPage />} />
         <Route path="/rides" element={<RidesPage />} />
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/history" element={<HistoryPage />} />
       </Routes>
       <ChatboxWidget />
     </AuthProvider>

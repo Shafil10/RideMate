@@ -75,6 +75,9 @@ export default function Navbar() {
       >
         <Link to="/" style={{ color: "inherit", textDecoration: "none" }}>Home</Link>
         <Link to="/rides" style={{ color: "inherit", textDecoration: "none" }}>Find a Ride</Link>
+        {user && (
+          <Link to="/history" style={{ color: "inherit", textDecoration: "none" }}>My Bookings</Link>
+        )}
         <a href="#universities">Universities</a>
         <a href="#about">About</a>
       </div>
@@ -153,6 +156,9 @@ export default function Navbar() {
       <div className={`navbar-mobile-panel${menuOpen ? " open" : ""}`}>
         <Link to="/" onClick={closeMenu} style={{ color: "inherit", textDecoration: "none", fontWeight: 600 }}>Home</Link>
         <Link to="/rides" onClick={closeMenu} style={{ color: "inherit", textDecoration: "none", fontWeight: 600 }}>Find a Ride</Link>
+        {user && (
+          <Link to="/history" onClick={closeMenu} style={{ color: "inherit", textDecoration: "none", fontWeight: 600 }}>My Bookings</Link>
+        )}
         <a href="#universities" onClick={closeMenu} style={{ fontWeight: 600 }}>Universities</a>
         <a href="#about" onClick={closeMenu} style={{ fontWeight: 600 }}>About</a>
 

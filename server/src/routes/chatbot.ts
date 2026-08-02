@@ -1,9 +1,13 @@
 import { Router } from "express";
-import { getChatbotReply } from "../chatbot/engine.js";
+import { chatbotSuggestions, getChatbotReply } from "../chatbot/engine.js";
 import { prisma } from "../prisma.js";
 import { optionalAuth } from "../middleware/auth.js";
 
 const router = Router();
+
+router.get("/suggestions", (_req, res) => {
+  res.json({ suggestions: chatbotSuggestions });
+});
 
 router.post("/message", optionalAuth, async (req, res) => {
   const { message } = req.body ?? {};
@@ -12,13 +16,13 @@ router.post("/message", optionalAuth, async (req, res) => {
     return res.status(400).json({ error: "A 'message' string is required." });
   }
 
-  const { reply, topicId } = getChatbotReply(message);
+  const { reply, topicId, suggestions } = getChatbotReply(message);
 
   await prisma.chatMessage.create({
     data: { message, reply, topicId, userId: req.user?.sub },
   });
 
-  res.json({ reply, topicId, respondedAt: new Date().toISOString() });
+  res.json({ reply, topicId, suggestions, respondedAt: new Date().toISOString() });
 });
 
 export default router;

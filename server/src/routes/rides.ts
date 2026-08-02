@@ -9,6 +9,7 @@ function serializeRide(ride: {
   type: string;
   origin: string;
   destination: string;
+  pickupPoint: string | null;
   university: string;
   departureTime: Date;
   seatsTotal: number;
@@ -22,6 +23,7 @@ function serializeRide(ride: {
     type: ride.type,
     origin: ride.origin,
     destination: ride.destination,
+    pickupPoint: ride.pickupPoint,
     university: ride.university,
     departureTime: ride.departureTime.toISOString(),
     seatsTotal: ride.seatsTotal,
@@ -41,9 +43,9 @@ router.get("/", async (_req, res) => {
 });
 
 router.post("/", requireAuth, async (req, res) => {
-  const { type, origin, destination, university, departureTime, seatsTotal, farePerSeat } = req.body ?? {};
+  const { type, origin, destination, pickupPoint, university, departureTime, seatsTotal, farePerSeat } = req.body ?? {};
 
-  if (!origin || !destination || !university || !departureTime) {
+  if (!origin || !destination || !pickupPoint || !university || !departureTime) {
     return res.status(400).json({ error: "Missing required ride fields." });
   }
 
@@ -52,6 +54,7 @@ router.post("/", requireAuth, async (req, res) => {
       type: type === "shared-taxi" ? "shared-taxi" : "student-driver",
       origin,
       destination,
+      pickupPoint: String(pickupPoint),
       university,
       departureTime: new Date(departureTime),
       seatsTotal: Number(seatsTotal) || 1,
@@ -65,21 +68,42 @@ router.post("/", requireAuth, async (req, res) => {
 });
 
 router.post("/:id/join", requireAuth, async (req, res) => {
+  const seats = Number(req.body?.seats) || 1;
+
+  if (seats < 1) {
+    return res.status(400).json({ error: "Seats to join must be at least 1." });
+  }
+
   const ride = await prisma.ride.findUnique({ where: { id: req.params.id }, include: { driver: { select: { name: true } } } });
 
   if (!ride) {
     return res.status(404).json({ error: "Ride not found." });
   }
 
-  if (ride.seatsTaken >= ride.seatsTotal) {
+  const remaining = ride.seatsTotal - ride.seatsTaken;
+  if (remaining <= 0) {
     return res.status(409).json({ error: "This ride is already full." });
   }
 
-  const updated = await prisma.ride.update({
-    where: { id: ride.id },
-    data: { seatsTaken: { increment: 1 } },
-    include: { driver: { select: { name: true } } },
-  });
+  if (seats > remaining) {
+    return res.status(409).json({ error: `Only ${remaining} seat(s) left on this ride.` });
+  }
+
+  const [updated] = await prisma.$transaction([
+    prisma.ride.update({
+      where: { id: ride.id },
+      data: { seatsTaken: { increment: seats } },
+      include: { driver: { select: { name: true } } },
+    }),
+    prisma.booking.create({
+      data: {
+        rideId: ride.id,
+        riderId: req.user!.sub,
+        seats,
+        pricePaid: seats * ride.farePerSeat,
+      },
+    }),
+  ]);
 
   res.json({ ride: serializeRide(updated) });
 });

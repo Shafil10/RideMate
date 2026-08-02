@@ -3,6 +3,7 @@ export interface Ride {
   type: "shared-taxi" | "student-driver";
   origin: string;
   destination: string;
+  pickupPoint: string | null;
   university: string;
   departureTime: string;
   seatsTotal: number;
@@ -16,6 +17,7 @@ export interface NewRideInput {
   type: Ride["type"];
   origin: string;
   destination: string;
+  pickupPoint: string;
   university: string;
   departureTime: string;
   seatsTotal: number;
@@ -47,12 +49,19 @@ export function createRide(input: NewRideInput, token: string): Promise<{ ride: 
   return request("/rides", { method: "POST", body: JSON.stringify(input) }, token);
 }
 
-export function joinRide(id: string, token: string): Promise<{ ride: Ride }> {
-  return request(`/rides/${id}/join`, { method: "POST" }, token);
+export function joinRide(id: string, seats: number, token: string): Promise<{ ride: Ride }> {
+  return request(`/rides/${id}/join`, { method: "POST", body: JSON.stringify({ seats }) }, token);
 }
 
-export function sendChatMessage(message: string, token?: string | null): Promise<{ reply: string; topicId: string }> {
+export function sendChatMessage(
+  message: string,
+  token?: string | null,
+): Promise<{ reply: string; topicId: string; suggestions: string[] }> {
   return request("/chatbot/message", { method: "POST", body: JSON.stringify({ message }) }, token);
+}
+
+export function fetchChatbotSuggestions(): Promise<{ suggestions: string[] }> {
+  return request("/chatbot/suggestions");
 }
 
 export interface AuthUser {
@@ -73,6 +82,27 @@ export function signup(
   university: string,
 ): Promise<{ token: string; user: AuthUser }> {
   return request("/auth/signup", { method: "POST", body: JSON.stringify({ name, email, password, university }) });
+}
+
+export interface Booking {
+  id: string;
+  seats: number;
+  pricePaid: number;
+  createdAt: string;
+  ride: {
+    id: string;
+    type: Ride["type"];
+    origin: string;
+    destination: string;
+    pickupPoint: string | null;
+    university: string;
+    departureTime: string;
+    driverName: string;
+  };
+}
+
+export function fetchMyBookings(token: string): Promise<{ bookings: Booking[] }> {
+  return request("/bookings/mine", undefined, token);
 }
 
 export interface Stat {

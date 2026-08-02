@@ -1,12 +1,38 @@
 import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { createRide, fetchRides, joinRide, type Ride } from "../lib/api";
+import { createRide, fetchRides, fetchUniversities, joinRide, type Ride } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
+
+const DHAKA_LOCATIONS = [
+  "Dhanmondi",
+  "Mirpur",
+  "Uttara",
+  "Gulshan",
+  "Banani",
+  "Mohammadpur",
+  "Farmgate",
+  "Motijheel",
+  "Bashundhara",
+  "Rampura",
+  "Badda",
+  "Mohakhali",
+  "Malibagh",
+  "Jatrabari",
+  "Savar",
+  "Shyamoli",
+  "Panthapath",
+  "Khilgaon",
+  "Tejgaon",
+  "Nikunja",
+  "Baridhara",
+  "Wari",
+];
 
 const emptyForm = {
   type: "student-driver" as Ride["type"],
   origin: "",
   destination: "",
+  pickupPoint: "",
   university: "",
   departureTime: "",
   seatsTotal: 3,
@@ -22,6 +48,8 @@ export default function RidesPage() {
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState(emptyForm);
   const [submitting, setSubmitting] = useState(false);
+  const [universities, setUniversities] = useState<string[]>([]);
+  const [joinSeats, setJoinSeats] = useState<Record<string, number>>({});
 
   function loadRides() {
     setLoading(true);
@@ -33,6 +61,9 @@ export default function RidesPage() {
 
   useEffect(() => {
     loadRides();
+    fetchUniversities()
+      .then((data) => setUniversities(data.universities))
+      .catch(() => setUniversities([]));
   }, []);
 
   useEffect(() => {
@@ -57,14 +88,15 @@ export default function RidesPage() {
     }
   }
 
-  async function handleJoin(id: string) {
+  async function handleJoin(id: string, remaining: number) {
     if (!token) {
       navigate("/login", { state: { from: "/rides#browse" } });
       return;
     }
+    const seats = Math.min(Math.max(joinSeats[id] ?? 1, 1), remaining);
     setError(null);
     try {
-      await joinRide(id, token);
+      await joinRide(id, seats, token);
       loadRides();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to join ride.");
@@ -110,27 +142,68 @@ export default function RidesPage() {
               <option value="shared-taxi">Shared Taxi Ride</option>
             </select>
 
-            <input
-              placeholder="Origin"
+            <select
               value={form.origin}
               onChange={(e) => setForm({ ...form, origin: e.target.value })}
               style={inputStyle}
               required
-            />
+            >
+              <option value="" disabled>
+                Starting from...
+              </option>
+              {DHAKA_LOCATIONS.map((loc) => (
+                <option key={loc} value={loc}>
+                  {loc}
+                </option>
+              ))}
+            </select>
 
-            <input
-              placeholder="Destination"
+            <select
               value={form.destination}
               onChange={(e) => setForm({ ...form, destination: e.target.value })}
               style={inputStyle}
               required
-            />
+            >
+              <option value="" disabled>
+                Going to...
+              </option>
+              <optgroup label="Universities">
+                {universities.map((uni) => (
+                  <option key={uni} value={uni}>
+                    {uni}
+                  </option>
+                ))}
+              </optgroup>
+              <optgroup label="Areas">
+                {DHAKA_LOCATIONS.map((loc) => (
+                  <option key={loc} value={loc}>
+                    {loc}
+                  </option>
+                ))}
+              </optgroup>
+            </select>
 
-            <input
-              placeholder="University"
+            <select
               value={form.university}
               onChange={(e) => setForm({ ...form, university: e.target.value })}
               style={inputStyle}
+              required
+            >
+              <option value="" disabled>
+                University
+              </option>
+              {universities.map((uni) => (
+                <option key={uni} value={uni}>
+                  {uni}
+                </option>
+              ))}
+            </select>
+
+            <input
+              placeholder="Exact pickup point (e.g. Road 5, House 12, near XYZ landmark)"
+              value={form.pickupPoint}
+              onChange={(e) => setForm({ ...form, pickupPoint: e.target.value })}
+              style={{ ...inputStyle, gridColumn: "1 / -1" }}
               required
             />
 
@@ -219,7 +292,9 @@ export default function RidesPage() {
       ) : (
         <div style={{ display: "grid", gap: 16 }}>
           {rides.map((ride) => {
-            const full = ride.seatsTaken >= ride.seatsTotal;
+            const remaining = ride.seatsTotal - ride.seatsTaken;
+            const full = remaining <= 0;
+            const seatsToJoin = Math.min(Math.max(joinSeats[ride.id] ?? 1, 1), Math.max(remaining, 1));
             return (
               <div
                 key={ride.id}
@@ -241,9 +316,34 @@ export default function RidesPage() {
                   <div style={{ color: "#555", fontSize: 14 }}>
                     Driver: {ride.driverName} · {ride.seatsTaken}/{ride.seatsTotal} seats taken · ৳{ride.farePerSeat}/seat
                   </div>
+                  {ride.pickupPoint && (
+                    <div style={{ color: "#16a34a", fontSize: 13, marginTop: 2 }}>Pickup: {ride.pickupPoint}</div>
+                  )}
                 </div>
+
+                {!full && user && (
+                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: "#555" }}>
+                      Seats
+                      <input
+                        type="number"
+                        min={1}
+                        max={remaining}
+                        value={seatsToJoin}
+                        onChange={(e) =>
+                          setJoinSeats({ ...joinSeats, [ride.id]: Number(e.target.value) })
+                        }
+                        style={{ width: 56, padding: "6px 8px", borderRadius: 6, border: "1px solid #d1d5db" }}
+                      />
+                    </label>
+                    <span style={{ fontSize: 13, color: "#555", whiteSpace: "nowrap" }}>
+                      = ৳{seatsToJoin * ride.farePerSeat}
+                    </span>
+                  </div>
+                )}
+
                 <button
-                  onClick={() => handleJoin(ride.id)}
+                  onClick={() => handleJoin(ride.id, remaining)}
                   disabled={full}
                   style={{
                     background: full ? "#e5e7eb" : "#16a34a",
@@ -256,7 +356,7 @@ export default function RidesPage() {
                     whiteSpace: "nowrap",
                   }}
                 >
-                  {full ? "Full" : user ? "Join" : "Log in to join"}
+                  {full ? "Full" : user ? `Join (৳${seatsToJoin * ride.farePerSeat})` : "Log in to join"}
                 </button>
               </div>
             );
