@@ -62,6 +62,60 @@ router.get("/", optionalAuth, async (req, res) => {
   });
 });
 
+router.get("/recommended", requireAuth, async (req, res) => {
+  const userId = req.user!.sub;
+
+  const [pastBookings, user] = await Promise.all([
+    prisma.booking.findMany({
+      where: { riderId: userId },
+      include: { ride: { select: { origin: true, destination: true } } },
+      orderBy: { createdAt: "desc" },
+      take: 20,
+    }),
+    prisma.user.findUnique({ where: { id: userId }, select: { university: true } }),
+  ]);
+
+  const originCounts = new Map<string, number>();
+  const destCounts = new Map<string, number>();
+  for (const b of pastBookings) {
+    originCounts.set(b.ride.origin, (originCounts.get(b.ride.origin) ?? 0) + 1);
+    destCounts.set(b.ride.destination, (destCounts.get(b.ride.destination) ?? 0) + 1);
+  }
+
+  const candidates = await prisma.ride.findMany({
+    where: { driverId: { not: userId }, departureTime: { gte: new Date() } },
+    include: {
+      driver: { select: { name: true } },
+      bookings: {
+        where: { status: "confirmed" },
+        select: { id: true, riderId: true, pickupPoint: true, pickupLat: true, pickupLng: true },
+      },
+      favorites: { where: { userId }, select: { id: true } },
+    },
+    orderBy: { departureTime: "asc" },
+  });
+
+  const scored = candidates
+    .filter((ride) => ride.seatsTaken < ride.seatsTotal)
+    .filter((ride) => !ride.bookings.some((b) => b.riderId === userId))
+    .map((ride) => {
+      let score = originCounts.get(ride.origin) ?? 0;
+      score += destCounts.get(ride.destination) ?? 0;
+      if (user?.university === ride.university) score += 0.5;
+      return { ride, score };
+    })
+    .filter(({ score }) => score > 0)
+    .sort((a, b) => b.score - a.score || a.ride.departureTime.getTime() - b.ride.departureTime.getTime())
+    .slice(0, 5);
+
+  res.json({
+    rides: scored.map(({ ride }) => {
+      const myBooking = ride.bookings.find((b) => b.riderId === userId);
+      return serializeRide(ride, myBooking, ride.favorites.length > 0);
+    }),
+  });
+});
+
 router.post("/", requireAuth, async (req, res) => {
   const { type, origin, destination, university, departureTime, seatsTotal, farePerSeat } = req.body ?? {};
 

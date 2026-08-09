@@ -1,3 +1,7 @@
+import { Capacitor } from "@capacitor/core";
+
+const API_BASE = Capacitor.isNativePlatform() ? "http://localhost:4000/api" : "/api";
+
 export interface Ride {
   id: string;
   type: "shared-taxi" | "student-driver";
@@ -25,7 +29,7 @@ export interface NewRideInput {
 }
 
 async function request<T>(path: string, options?: RequestInit, token?: string | null): Promise<T> {
-  const res = await fetch(`/api${path}`, {
+  const res = await fetch(`${API_BASE}${path}`, {
     headers: {
       "Content-Type": "application/json",
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -43,6 +47,10 @@ async function request<T>(path: string, options?: RequestInit, token?: string | 
 
 export function fetchRides(token?: string | null): Promise<{ rides: Ride[] }> {
   return request("/rides", undefined, token);
+}
+
+export function fetchRecommendedRides(token: string): Promise<{ rides: Ride[] }> {
+  return request("/rides/recommended", undefined, token);
 }
 
 export function createRide(input: NewRideInput, token: string): Promise<{ ride: Ride }> {
@@ -70,8 +78,12 @@ export function toggleFavorite(id: string, token: string): Promise<{ isFavorited
   return request(`/rides/${id}/favorite`, { method: "POST" }, token);
 }
 
-export function sendChatMessage(message: string, token?: string | null): Promise<{ reply: string; topicId: string }> {
-  return request("/chatbot/message", { method: "POST", body: JSON.stringify({ message }) }, token);
+export function sendChatMessage(
+  message: string,
+  sessionId: string,
+  token?: string | null,
+): Promise<{ reply: string; topicId: string }> {
+  return request("/chatbot/message", { method: "POST", body: JSON.stringify({ message, sessionId }) }, token);
 }
 
 export interface AuthUser {

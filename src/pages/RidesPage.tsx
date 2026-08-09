@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { cancelBooking, createRide, fetchRides, joinRide, toggleFavorite, type Ride } from "../lib/api";
+import { cancelBooking, createRide, fetchRecommendedRides, fetchRides, joinRide, toggleFavorite, type Ride } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
 import PickupMapPicker, { type LatLng } from "../components/rides/PickupMapPicker";
 
@@ -34,6 +34,7 @@ export default function RidesPage() {
   const navigate = useNavigate();
   const [rides, setRides] = useState<Ride[]>([]);
   const [loading, setLoading] = useState(true);
+  const [recommendedRides, setRecommendedRides] = useState<Ride[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [form, setForm] = useState(emptyForm);
@@ -59,6 +60,16 @@ export default function RidesPage() {
     loadRides();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
+
+  useEffect(() => {
+    if (!token) {
+      setRecommendedRides([]);
+      return;
+    }
+    fetchRecommendedRides(token)
+      .then((data) => setRecommendedRides(data.rides))
+      .catch(() => setRecommendedRides([]));
+  }, [token, rides]);
 
   useEffect(() => {
     if (!location.hash) return;
@@ -310,6 +321,97 @@ export default function RidesPage() {
           </div>
         )}
       </div>
+
+      {token && recommendedRides.length > 0 && (
+        <div style={{ marginBottom: 32 }}>
+          <h2 style={{ fontSize: 20, marginBottom: 4 }}>Recommended for you</h2>
+          <p style={{ color: "#8b968f", fontSize: 13, marginBottom: 16 }}>
+            Matched to routes you've ridden before
+          </p>
+          <div style={{ display: "flex", gap: 14, overflowX: "auto", paddingBottom: 4 }}>
+            {recommendedRides.map((ride) => (
+              <div
+                key={ride.id}
+                style={{
+                  minWidth: 240,
+                  flex: "0 0 auto",
+                  border: "1px solid #bbf7d0",
+                  background: "#f0fdf4",
+                  borderRadius: 12,
+                  padding: 16,
+                }}
+              >
+                <div style={{ fontWeight: 700, fontSize: 14 }}>
+                  {ride.origin} → {ride.destination}
+                </div>
+                <div style={{ color: "#555", fontSize: 13, marginTop: 4 }}>
+                  {new Date(ride.departureTime).toLocaleString()}
+                </div>
+                <div style={{ color: "#555", fontSize: 13 }}>
+                  ৳{ride.farePerSeat}/seat · {ride.seatsTotal - ride.seatsTaken} seats left
+                </div>
+                <button
+                  onClick={() => handleJoinClick(ride.id)}
+                  style={{
+                    marginTop: 10,
+                    background: "#16a34a",
+                    color: "white",
+                    border: "none",
+                    padding: "8px 16px",
+                    borderRadius: 20,
+                    fontWeight: 700,
+                    fontSize: 13,
+                    cursor: "pointer",
+                  }}
+                >
+                  Join
+                </button>
+
+                {joiningRideId === ride.id && (
+                  <div style={{ marginTop: 12, display: "grid", gap: 8 }}>
+                    <PickupMapPicker value={pickupLocation} onChange={setPickupLocation} />
+                    <input
+                      autoFocus
+                      placeholder="Pickup point label"
+                      value={pickupPoint}
+                      onChange={(e) => setPickupPoint(e.target.value)}
+                      style={{ ...inputStyle, fontSize: 13 }}
+                    />
+                    <div style={{ display: "flex", gap: 8 }}>
+                      <button
+                        onClick={() => handleConfirmJoin(ride.id)}
+                        disabled={busyRideId === ride.id}
+                        style={{
+                          background: "#16a34a",
+                          color: "white",
+                          border: "none",
+                          padding: "8px 16px",
+                          borderRadius: 20,
+                          fontWeight: 700,
+                          fontSize: 13,
+                          cursor: "pointer",
+                        }}
+                      >
+                        {busyRideId === ride.id ? "Confirming..." : "Confirm"}
+                      </button>
+                      <button
+                        onClick={() => {
+                          setJoiningRideId(null);
+                          setPickupPoint("");
+                          setPickupLocation(null);
+                        }}
+                        style={{ background: "none", border: "1px solid #d1d5db", padding: "8px 16px", borderRadius: 20, fontSize: 13, cursor: "pointer" }}
+                      >
+                        Dismiss
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <h2 id="browse" style={{ fontSize: 20, marginBottom: 16, scrollMarginTop: 100 }}>
         Available Rides

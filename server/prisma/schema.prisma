@@ -73,6 +73,7 @@ model Favorite {
 
 model ChatMessage {
   id         String   @id @default(cuid())
+  sessionId  String
   message    String
   reply      String
   topicId    String
@@ -80,6 +81,8 @@ model ChatMessage {
 
   user   User?   @relation(fields: [userId], references: [id])
   userId String?
+
+  @@index([sessionId])
 }
 
 model Stat {
