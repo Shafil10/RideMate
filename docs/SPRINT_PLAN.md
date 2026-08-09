@@ -39,39 +39,45 @@ Goal: a demoable slice of the real product — students can browse/create/join r
 ---
 
 ## Sprint 3 (Week 3) — Auth & Persistent Data
+**Status: ✅ Done**
+
 Goal: move off in-memory storage and add real accounts.
 
-- [ ] Add a database (SQLite/Postgres via Prisma, or MongoDB) replacing the in-memory `rides` array
-- [ ] University-email-based signup/login, JWT session auth
-- [ ] Protect ride creation/join behind auth; attach rides to a real user
-- [ ] Persist chatbot conversation logs (for later support review + AI upgrade)
-- [ ] Extend CI to run DB migrations in the pipeline
+- [x] Add a database (SQLite via Prisma) replacing the in-memory `rides` array
+- [x] University-email-based signup/login, JWT session auth
+- [x] Protect ride creation/join behind auth; attach rides to a real user
+- [x] Persist chatbot conversation logs (for later support review + AI upgrade)
+- [x] Extend CI to run DB migrations in the pipeline
 
 **Deliverable:** accounts persist across restarts; rides are owned by real users.
 
 ---
 
 ## Sprint 4 (Week 4) — AI Chatbox Helpline v2 (Real LLM Integration)
+**Status: ✅ Done (demo-ready)**
+
 Goal: upgrade the helpline from rule-based to a real AI-backed assistant.
 
-- [ ] Integrate an LLM API (e.g. Claude API) behind the backend so the key never reaches the browser
-- [ ] Maintain per-session conversation context/history
-- [ ] Scope/guardrail the assistant to RideMate topics; keep the human-escalation path
-- [ ] Store chat transcripts for support review and quality tuning
-- [ ] Compare rule-based vs. AI reply accuracy on a fixed FAQ test set before fully cutting over
+- [x] Integrate an LLM API (Groq/Llama 3.3 70B — chosen over Claude for free-tier access without regional/billing friction) behind the backend so the key never reaches the browser
+- [x] Maintain per-session conversation context/history
+- [x] Scope/guardrail the assistant to RideMate topics; keep the human-escalation path
+- [x] Store chat transcripts for support review and quality tuning
+- [ ] Compare rule-based vs. AI reply accuracy on a fixed FAQ test set before fully cutting over (rule-based engine still kept as an automatic fallback if the AI call fails)
 
 **Deliverable:** chatbox gives real AI-generated, context-aware answers instead of fixed replies.
 
 ---
 
 ## Sprint 5 (Week 5) — AI Ride Matching, Phase 1
+**Status: 🟡 Partially done (scoped for time)**
+
 Goal: begin the deferred AI matching feature set.
 
-- [ ] Route-matching algorithm: surface nearby drivers/riders by origin-destination proximity
+- [x] "Recommended rides for you" section on the Rides page — scored against the rider's actual past booking history (origin/destination frequency), not a placeholder or random pick
+- [ ] Full route-matching algorithm (geographic proximity, not just exact origin/destination string match)
 - [ ] Fair fare calculation (distance/time-based split, not just flat per-seat fare)
-- [ ] "Recommended rides for you" section on the Rides page powered by the matcher
 
-**Deliverable:** ride recommendations are no longer just a static list — they're matched to the student's route.
+**Deliverable:** ride recommendations are no longer just a static list — they're matched to the student's route. (Shipped a real, working v1 based on booking history; full geographic matching and fare-splitting deferred to keep scope realistic for the demo timeline.)
 
 ---
 
@@ -79,7 +85,7 @@ Goal: begin the deferred AI matching feature set.
 Goal: complete the AI feature set and add the safety layer that supports it.
 
 - [ ] Reliability prediction (driver/rider score from ride history)
-- [ ] Smart pickup-point suggestions
+- [ ] Smart pickup-point suggestions — driver marks their actual intended route (not just origin/destination labels); riders see that path on the map and pick a pickup point that's genuinely on the way, instead of guessing between two endpoints
 - [ ] Recurring-ride prediction (detect regular commute patterns, suggest auto-matching)
 - [ ] Traffic-aware cost estimation (integrate a maps/traffic API)
 - [ ] Trust score + rating UI shown on ride cards and profiles

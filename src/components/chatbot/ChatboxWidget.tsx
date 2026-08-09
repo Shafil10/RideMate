@@ -11,6 +11,16 @@ interface ChatMessage {
 
 let nextId = 1;
 
+function getSessionId(): string {
+  const key = "ridemate-chat-session-id";
+  let id = sessionStorage.getItem(key);
+  if (!id) {
+    id = crypto.randomUUID();
+    sessionStorage.setItem(key, id);
+  }
+  return id;
+}
+
 const welcomeMessage: ChatMessage = {
   id: 0,
   sender: "bot",
@@ -39,7 +49,7 @@ export default function ChatboxWidget() {
     setSending(true);
 
     try {
-      const { reply } = await sendChatMessage(text, token);
+      const { reply } = await sendChatMessage(text, getSessionId(), token);
       setMessages((prev) => [...prev, { id: nextId++, sender: "bot", text: reply }]);
     } catch {
       setMessages((prev) => [
