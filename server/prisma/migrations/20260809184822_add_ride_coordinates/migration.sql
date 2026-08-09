@@ -1,0 +1,5 @@
+-- AlterTable
+ALTER TABLE "Ride" ADD COLUMN "destLat" REAL;
+ALTER TABLE "Ride" ADD COLUMN "destLng" REAL;
+ALTER TABLE "Ride" ADD COLUMN "originLat" REAL;
+ALTER TABLE "Ride" ADD COLUMN "originLng" REAL;

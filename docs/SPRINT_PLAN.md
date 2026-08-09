@@ -69,15 +69,15 @@ Goal: upgrade the helpline from rule-based to a real AI-backed assistant.
 ---
 
 ## Sprint 5 (Week 5) — AI Ride Matching, Phase 1
-**Status: 🟡 Partially done (scoped for time)**
+**Status: ✅ Done**
 
 Goal: begin the deferred AI matching feature set.
 
-- [x] "Recommended rides for you" section on the Rides page — scored against the rider's actual past booking history (origin/destination frequency), not a placeholder or random pick
-- [ ] Full route-matching algorithm (geographic proximity, not just exact origin/destination string match)
-- [ ] Fair fare calculation (distance/time-based split, not just flat per-seat fare)
+- [x] "Recommended rides for you" section on the Rides page — scored against the rider's actual past booking history (origin/destination frequency)
+- [x] Route-matching algorithm — rides now store real origin/destination coordinates (pinned on a map at creation); recommendations use Haversine distance so a ride within ~3km of a route the rider has taken before is surfaced even if the text label is completely different (verified: "North South" vs. "NSU Bashundhara Campus")
+- [x] Fair fare calculation — suggested fare is computed from actual trip distance (base fare + rate/km) instead of the driver guessing a flat number; driver can still override it
 
-**Deliverable:** ride recommendations are no longer just a static list — they're matched to the student's route. (Shipped a real, working v1 based on booking history; full geographic matching and fare-splitting deferred to keep scope realistic for the demo timeline.)
+**Deliverable:** ride recommendations are no longer just a static list — they're matched to the student's real route, and fares are grounded in real distance instead of guesswork. Time-of-day/traffic-aware fare refinement is deferred to Sprint 6 ("Traffic-aware cost estimation"), which already covers that.
 
 ---
 

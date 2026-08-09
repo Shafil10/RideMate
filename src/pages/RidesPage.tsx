@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { cancelBooking, createRide, fetchRecommendedRides, fetchRides, joinRide, toggleFavorite, type Ride } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
 import PickupMapPicker, { type LatLng } from "../components/rides/PickupMapPicker";
+import { haversineKm, estimateFairFare } from "../lib/geo";
 
 const CANCELLATION_FEE = 50;
 
@@ -47,6 +48,23 @@ export default function RidesPage() {
   const [timeFrom, setTimeFrom] = useState("");
   const [timeTo, setTimeTo] = useState("");
   const [favoritesOnly, setFavoritesOnly] = useState(false);
+  const [originLocation, setOriginLocation] = useState<LatLng | null>(null);
+  const [destLocation, setDestLocation] = useState<LatLng | null>(null);
+  const [showOriginMap, setShowOriginMap] = useState(false);
+  const [showDestMap, setShowDestMap] = useState(false);
+  const [fareManuallySet, setFareManuallySet] = useState(false);
+
+  const suggestedFare = useMemo(() => {
+    if (!originLocation || !destLocation) return null;
+    const distanceKm = haversineKm(originLocation.lat, originLocation.lng, destLocation.lat, destLocation.lng);
+    return { distanceKm, fare: estimateFairFare(distanceKm) };
+  }, [originLocation, destLocation]);
+
+  useEffect(() => {
+    if (suggestedFare && !fareManuallySet) {
+      setForm((f) => ({ ...f, farePerSeat: suggestedFare.fare }));
+    }
+  }, [suggestedFare, fareManuallySet]);
 
   function loadRides() {
     setLoading(true);
@@ -83,8 +101,22 @@ export default function RidesPage() {
     setSubmitting(true);
     setError(null);
     try {
-      await createRide(form, token);
+      await createRide(
+        {
+          ...form,
+          originLat: originLocation?.lat ?? null,
+          originLng: originLocation?.lng ?? null,
+          destLat: destLocation?.lat ?? null,
+          destLng: destLocation?.lng ?? null,
+        },
+        token,
+      );
       setForm(emptyForm);
+      setOriginLocation(null);
+      setDestLocation(null);
+      setShowOriginMap(false);
+      setShowDestMap(false);
+      setFareManuallySet(false);
       loadRides();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create ride.");
@@ -222,21 +254,45 @@ export default function RidesPage() {
               <option value="shared-taxi">Shared Taxi Ride</option>
             </select>
 
-            <input
-              placeholder="Origin"
-              value={form.origin}
-              onChange={(e) => setForm({ ...form, origin: e.target.value })}
-              style={inputStyle}
-              required
-            />
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              <div style={{ display: "flex", gap: 8 }}>
+                <input
+                  placeholder="Origin"
+                  value={form.origin}
+                  onChange={(e) => setForm({ ...form, origin: e.target.value })}
+                  style={{ ...inputStyle, flex: 1 }}
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowOriginMap((v) => !v)}
+                  style={pinToggleStyle(!!originLocation)}
+                >
+                  {originLocation ? "📍 Pinned" : "📍 Pin"}
+                </button>
+              </div>
+              {showOriginMap && <PickupMapPicker value={originLocation} onChange={setOriginLocation} />}
+            </div>
 
-            <input
-              placeholder="Destination"
-              value={form.destination}
-              onChange={(e) => setForm({ ...form, destination: e.target.value })}
-              style={inputStyle}
-              required
-            />
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              <div style={{ display: "flex", gap: 8 }}>
+                <input
+                  placeholder="Destination"
+                  value={form.destination}
+                  onChange={(e) => setForm({ ...form, destination: e.target.value })}
+                  style={{ ...inputStyle, flex: 1 }}
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowDestMap((v) => !v)}
+                  style={pinToggleStyle(!!destLocation)}
+                >
+                  {destLocation ? "📍 Pinned" : "📍 Pin"}
+                </button>
+              </div>
+              {showDestMap && <PickupMapPicker value={destLocation} onChange={setDestLocation} />}
+            </div>
 
             <input
               placeholder="University"
@@ -263,14 +319,25 @@ export default function RidesPage() {
               style={inputStyle}
             />
 
-            <input
-              type="number"
-              min={0}
-              placeholder="Fare per seat (BDT)"
-              value={form.farePerSeat}
-              onChange={(e) => setForm({ ...form, farePerSeat: Number(e.target.value) })}
-              style={inputStyle}
-            />
+            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+              <input
+                type="number"
+                min={0}
+                placeholder="Fare per seat (BDT)"
+                value={form.farePerSeat}
+                onChange={(e) => {
+                  setFareManuallySet(true);
+                  setForm({ ...form, farePerSeat: Number(e.target.value) });
+                }}
+                style={inputStyle}
+              />
+              {suggestedFare && (
+                <span style={{ fontSize: 11.5, color: "#8b968f" }}>
+                  Suggested: ৳{suggestedFare.fare} for {suggestedFare.distanceKm.toFixed(1)} km (pin both origin and
+                  destination for a fair-fare estimate)
+                </span>
+              )}
+            </div>
 
             <button
               type="submit"
@@ -628,3 +695,16 @@ const inputStyle: React.CSSProperties = {
   border: "1px solid #d1d5db",
   fontSize: 14,
 };
+
+function pinToggleStyle(active: boolean): React.CSSProperties {
+  return {
+    background: active ? "#dcfce7" : "#eef2f0",
+    border: "1px solid " + (active ? "#16a34a" : "#d1d5db"),
+    borderRadius: 8,
+    padding: "0 14px",
+    fontSize: 13,
+    fontWeight: 600,
+    cursor: "pointer",
+    whiteSpace: "nowrap",
+  };
+}
