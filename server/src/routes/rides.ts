@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { prisma } from "../prisma.js";
 import { requireAuth, optionalAuth } from "../middleware/auth.js";
+import { haversineKm } from "../lib/geo.js";
 
 const router = Router();
 
@@ -11,7 +12,11 @@ function serializeRide(
     id: string;
     type: string;
     origin: string;
+    originLat: number | null;
+    originLng: number | null;
     destination: string;
+    destLat: number | null;
+    destLng: number | null;
     university: string;
     departureTime: Date;
     seatsTotal: number;
@@ -27,7 +32,11 @@ function serializeRide(
     id: ride.id,
     type: ride.type,
     origin: ride.origin,
+    originLat: ride.originLat,
+    originLng: ride.originLng,
     destination: ride.destination,
+    destLat: ride.destLat,
+    destLng: ride.destLng,
     university: ride.university,
     departureTime: ride.departureTime.toISOString(),
     seatsTotal: ride.seatsTotal,
@@ -68,7 +77,7 @@ router.get("/recommended", requireAuth, async (req, res) => {
   const [pastBookings, user] = await Promise.all([
     prisma.booking.findMany({
       where: { riderId: userId },
-      include: { ride: { select: { origin: true, destination: true } } },
+      include: { ride: { select: { origin: true, originLat: true, originLng: true, destination: true, destLat: true, destLng: true } } },
       orderBy: { createdAt: "desc" },
       take: 20,
     }),
@@ -77,9 +86,23 @@ router.get("/recommended", requireAuth, async (req, res) => {
 
   const originCounts = new Map<string, number>();
   const destCounts = new Map<string, number>();
+  const originPoints: { lat: number; lng: number }[] = [];
+  const destPoints: { lat: number; lng: number }[] = [];
   for (const b of pastBookings) {
     originCounts.set(b.ride.origin, (originCounts.get(b.ride.origin) ?? 0) + 1);
     destCounts.set(b.ride.destination, (destCounts.get(b.ride.destination) ?? 0) + 1);
+    if (b.ride.originLat !== null && b.ride.originLng !== null) originPoints.push({ lat: b.ride.originLat, lng: b.ride.originLng });
+    if (b.ride.destLat !== null && b.ride.destLng !== null) destPoints.push({ lat: b.ride.destLat, lng: b.ride.destLng });
+  }
+
+  // Rides within this radius of a route the rider has taken before count as "on the way".
+  const PROXIMITY_RADIUS_KM = 3;
+
+  function proximityScore(points: { lat: number; lng: number }[], lat: number | null, lng: number | null): number {
+    if (lat === null || lng === null || points.length === 0) return 0;
+    const nearestKm = Math.min(...points.map((p) => haversineKm(p.lat, p.lng, lat, lng)));
+    if (nearestKm > PROXIMITY_RADIUS_KM) return 0;
+    return 2 * (1 - nearestKm / PROXIMITY_RADIUS_KM);
   }
 
   const candidates = await prisma.ride.findMany({
@@ -101,6 +124,8 @@ router.get("/recommended", requireAuth, async (req, res) => {
     .map((ride) => {
       let score = originCounts.get(ride.origin) ?? 0;
       score += destCounts.get(ride.destination) ?? 0;
+      score += proximityScore(originPoints, ride.originLat, ride.originLng);
+      score += proximityScore(destPoints, ride.destLat, ride.destLng);
       if (user?.university === ride.university) score += 0.5;
       return { ride, score };
     })
@@ -117,7 +142,8 @@ router.get("/recommended", requireAuth, async (req, res) => {
 });
 
 router.post("/", requireAuth, async (req, res) => {
-  const { type, origin, destination, university, departureTime, seatsTotal, farePerSeat } = req.body ?? {};
+  const { type, origin, originLat, originLng, destination, destLat, destLng, university, departureTime, seatsTotal, farePerSeat } =
+    req.body ?? {};
 
   if (!origin || !destination || !university || !departureTime) {
     return res.status(400).json({ error: "Missing required ride fields." });
@@ -127,7 +153,11 @@ router.post("/", requireAuth, async (req, res) => {
     data: {
       type: type === "shared-taxi" ? "shared-taxi" : "student-driver",
       origin,
+      originLat: typeof originLat === "number" ? originLat : null,
+      originLng: typeof originLng === "number" ? originLng : null,
       destination,
+      destLat: typeof destLat === "number" ? destLat : null,
+      destLng: typeof destLng === "number" ? destLng : null,
       university,
       departureTime: new Date(departureTime),
       seatsTotal: Number(seatsTotal) || 1,

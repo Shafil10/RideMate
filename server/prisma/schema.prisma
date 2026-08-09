@@ -26,7 +26,11 @@ model Ride {
   id            String   @id @default(cuid())
   type          String
   origin        String
+  originLat     Float?
+  originLng     Float?
   destination   String
+  destLat       Float?
+  destLng       Float?
   university    String
   departureTime DateTime
   seatsTotal    Int

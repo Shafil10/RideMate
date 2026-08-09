@@ -6,7 +6,11 @@ export interface Ride {
   id: string;
   type: "shared-taxi" | "student-driver";
   origin: string;
+  originLat: number | null;
+  originLng: number | null;
   destination: string;
+  destLat: number | null;
+  destLng: number | null;
   university: string;
   departureTime: string;
   seatsTotal: number;
@@ -21,7 +25,11 @@ export interface Ride {
 export interface NewRideInput {
   type: Ride["type"];
   origin: string;
+  originLat?: number | null;
+  originLng?: number | null;
   destination: string;
+  destLat?: number | null;
+  destLng?: number | null;
   university: string;
   departureTime: string;
   seatsTotal: number;
