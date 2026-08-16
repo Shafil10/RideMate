@@ -7,6 +7,53 @@ const router = Router();
 
 const CANCELLATION_FEE = 50;
 
+// A driver needs a handful of ratings before a reliability label means anything —
+// below this, we show the raw stars only rather than a label that would be noise.
+const MIN_RATINGS_FOR_LABEL = 3;
+
+function reliabilityLabel(average: number, count: number): string | null {
+  if (count < MIN_RATINGS_FOR_LABEL) return null;
+  if (average >= 4.5) return "Highly reliable";
+  if (average < 3.5) return "Mixed feedback";
+  return null;
+}
+
+async function getRatingSummaries(
+  userIds: string[],
+): Promise<Map<string, { average: number; count: number; ridesCompleted: number; label: string | null }>> {
+  const uniqueIds = [...new Set(userIds)];
+  if (uniqueIds.length === 0) return new Map();
+
+  const [grouped, completedCounts] = await Promise.all([
+    prisma.rating.groupBy({
+      by: ["ratedId"],
+      where: { ratedId: { in: uniqueIds } },
+      _avg: { score: true },
+      _count: { score: true },
+    }),
+    prisma.ride.groupBy({
+      by: ["driverId"],
+      where: { driverId: { in: uniqueIds }, departureTime: { lt: new Date() } },
+      _count: { id: true },
+    }),
+  ]);
+
+  const completedMap = new Map(completedCounts.map((c) => [c.driverId, c._count.id]));
+
+  const map = new Map<string, { average: number; count: number; ridesCompleted: number; label: string | null }>();
+  for (const g of grouped) {
+    const average = Math.round((g._avg.score ?? 0) * 10) / 10;
+    const count = g._count.score;
+    map.set(g.ratedId, {
+      average,
+      count,
+      ridesCompleted: completedMap.get(g.ratedId) ?? 0,
+      label: reliabilityLabel(average, count),
+    });
+  }
+  return map;
+}
+
 function serializeRide(
   ride: {
     id: string;
@@ -23,10 +70,12 @@ function serializeRide(
     seatsTaken: number;
     farePerSeat: number;
     createdAt: Date;
+    driverId: string;
     driver: { name: string };
   },
   myBooking?: { id: string; pickupPoint: string; pickupLat: number | null; pickupLng: number | null } | null,
   isFavorited = false,
+  driverRating?: { average: number; count: number; ridesCompleted: number; label: string | null } | null,
 ) {
   return {
     id: ride.id,
@@ -42,7 +91,9 @@ function serializeRide(
     seatsTotal: ride.seatsTotal,
     seatsTaken: ride.seatsTaken,
     farePerSeat: ride.farePerSeat,
+    driverId: ride.driverId,
     driverName: ride.driver.name,
+    driverRating: driverRating ?? null,
     createdAt: ride.createdAt.toISOString(),
     myBooking: myBooking ?? null,
     isFavorited,
@@ -62,11 +113,13 @@ router.get("/", optionalAuth, async (req, res) => {
     orderBy: { departureTime: "asc" },
   });
 
+  const ratingMap = await getRatingSummaries(rides.map((r) => r.driverId));
+
   res.json({
     rides: rides.map((ride) => {
       const myBooking = req.user ? ride.bookings.find((b) => b.riderId === req.user!.sub) : undefined;
       const isFavorited = "favorites" in ride ? ride.favorites.length > 0 : false;
-      return serializeRide(ride, myBooking, isFavorited);
+      return serializeRide(ride, myBooking, isFavorited, ratingMap.get(ride.driverId) ?? null);
     }),
   });
 });
@@ -133,10 +186,12 @@ router.get("/recommended", requireAuth, async (req, res) => {
     .sort((a, b) => b.score - a.score || a.ride.departureTime.getTime() - b.ride.departureTime.getTime())
     .slice(0, 5);
 
+  const ratingMap = await getRatingSummaries(scored.map(({ ride }) => ride.driverId));
+
   res.json({
     rides: scored.map(({ ride }) => {
       const myBooking = ride.bookings.find((b) => b.riderId === userId);
-      return serializeRide(ride, myBooking, ride.favorites.length > 0);
+      return serializeRide(ride, myBooking, ride.favorites.length > 0, ratingMap.get(ride.driverId) ?? null);
     }),
   });
 });
@@ -263,6 +318,200 @@ router.post("/:id/favorite", requireAuth, async (req, res) => {
 
   await prisma.favorite.create({ data: { userId: req.user!.sub, rideId: req.params.id } });
   res.json({ isFavorited: true });
+});
+
+// A route needs to repeat at least this many times before we call it "recurring" —
+// below this it's just coincidence, not a pattern worth surfacing.
+const MIN_OCCURRENCES_FOR_PATTERN = 3;
+
+router.get("/recurring", requireAuth, async (req, res) => {
+  const userId = req.user!.sub;
+
+  const bookings = await prisma.booking.findMany({
+    where: { riderId: userId, status: "confirmed" },
+    include: { ride: { select: { origin: true, destination: true, university: true, departureTime: true } } },
+    orderBy: { createdAt: "desc" },
+    take: 100,
+  });
+
+  const groups = new Map<
+    string,
+    { origin: string; destination: string; university: string; hours: number[]; count: number }
+  >();
+
+  for (const b of bookings) {
+    const key = `${b.ride.origin}|${b.ride.destination}`;
+    const hour = b.ride.departureTime.getHours();
+    const existing = groups.get(key);
+    if (existing) {
+      existing.count += 1;
+      existing.hours.push(hour);
+    } else {
+      groups.set(key, {
+        origin: b.ride.origin,
+        destination: b.ride.destination,
+        university: b.ride.university,
+        hours: [hour],
+        count: 1,
+      });
+    }
+  }
+
+  const patterns = [...groups.values()]
+    .filter((g) => g.count >= MIN_OCCURRENCES_FOR_PATTERN)
+    .map((g) => {
+      const avgHour = Math.round(g.hours.reduce((a, b) => a + b, 0) / g.hours.length);
+      return {
+        origin: g.origin,
+        destination: g.destination,
+        university: g.university,
+        count: g.count,
+        typicalHour: avgHour,
+      };
+    })
+    .sort((a, b) => b.count - a.count);
+
+  res.json({ patterns });
+});
+
+router.get("/pickup-suggestions", requireAuth, async (req, res) => {
+  const userId = req.user!.sub;
+
+  const bookings = await prisma.booking.findMany({
+    where: { riderId: userId, status: "confirmed" },
+    select: { pickupPoint: true, pickupLat: true, pickupLng: true, createdAt: true },
+    orderBy: { createdAt: "desc" },
+    take: 50,
+  });
+
+  const counts = new Map<string, { count: number; lat: number | null; lng: number | null }>();
+  for (const b of bookings) {
+    const existing = counts.get(b.pickupPoint);
+    if (existing) {
+      existing.count += 1;
+    } else {
+      counts.set(b.pickupPoint, { count: 1, lat: b.pickupLat, lng: b.pickupLng });
+    }
+  }
+
+  const suggestions = [...counts.entries()]
+    .sort((a, b) => b[1].count - a[1].count)
+    .slice(0, 5)
+    .map(([pickupPoint, info]) => ({ pickupPoint, count: info.count, lat: info.lat, lng: info.lng }));
+
+  res.json({ suggestions });
+});
+
+router.get("/history", requireAuth, async (req, res) => {
+  const userId = req.user!.sub;
+
+  const rides = await prisma.ride.findMany({
+    where: {
+      departureTime: { lt: new Date() },
+      OR: [{ driverId: userId }, { bookings: { some: { riderId: userId, status: "confirmed" } } }],
+    },
+    include: {
+      driver: { select: { id: true, name: true } },
+      bookings: {
+        where: { status: "confirmed" },
+        select: { riderId: true, rider: { select: { name: true } } },
+      },
+    },
+    orderBy: { departureTime: "desc" },
+  });
+
+  const rideIds = rides.map((r) => r.id);
+  const myRatings = await prisma.rating.findMany({
+    where: { rideId: { in: rideIds }, raterId: userId },
+    select: { rideId: true, ratedId: true },
+  });
+  const alreadyRated = new Set(myRatings.map((r) => `${r.rideId}:${r.ratedId}`));
+
+  const history = rides.map((ride) => {
+    const isDriver = ride.driverId === userId;
+    const counterparts = isDriver
+      ? ride.bookings.map((b) => ({
+          userId: b.riderId,
+          name: b.rider.name,
+          alreadyRated: alreadyRated.has(`${ride.id}:${b.riderId}`),
+        }))
+      : [
+          {
+            userId: ride.driver.id,
+            name: ride.driver.name,
+            alreadyRated: alreadyRated.has(`${ride.id}:${ride.driver.id}`),
+          },
+        ];
+
+    return {
+      id: ride.id,
+      origin: ride.origin,
+      destination: ride.destination,
+      departureTime: ride.departureTime.toISOString(),
+      type: ride.type,
+      isDriver,
+      counterparts,
+    };
+  });
+
+  res.json({ history });
+});
+
+router.post("/:id/ratings", requireAuth, async (req, res) => {
+  const userId = req.user!.sub;
+  const { ratedUserId, score, comment } = req.body ?? {};
+
+  const numericScore = Number(score);
+  if (!ratedUserId || !Number.isInteger(numericScore) || numericScore < 1 || numericScore > 5) {
+    return res.status(400).json({ error: "A ratedUserId and an integer score from 1 to 5 are required." });
+  }
+
+  const ride = await prisma.ride.findUnique({
+    where: { id: req.params.id },
+    include: { bookings: { where: { status: "confirmed" }, select: { riderId: true } } },
+  });
+
+  if (!ride) {
+    return res.status(404).json({ error: "Ride not found." });
+  }
+
+  if (ride.departureTime > new Date()) {
+    return res.status(400).json({ error: "You can only rate a ride after it has departed." });
+  }
+
+  const isDriver = ride.driverId === userId;
+  const isRider = ride.bookings.some((b) => b.riderId === userId);
+
+  if (!isDriver && !isRider) {
+    return res.status(403).json({ error: "You didn't take part in this ride." });
+  }
+
+  const validTarget = isDriver
+    ? ride.bookings.some((b) => b.riderId === ratedUserId)
+    : ratedUserId === ride.driverId;
+
+  if (!validTarget) {
+    return res.status(400).json({ error: "You can only rate someone you actually rode with on this trip." });
+  }
+
+  if (ratedUserId === userId) {
+    return res.status(400).json({ error: "You can't rate yourself." });
+  }
+
+  try {
+    const rating = await prisma.rating.create({
+      data: {
+        rideId: ride.id,
+        raterId: userId,
+        ratedId: ratedUserId,
+        score: numericScore,
+        comment: typeof comment === "string" && comment.trim() ? comment.trim() : null,
+      },
+    });
+    res.status(201).json({ rating });
+  } catch {
+    res.status(409).json({ error: "You've already rated this person for this ride." });
+  }
 });
 
 export default router;

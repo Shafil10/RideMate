@@ -16,10 +16,22 @@ export interface Ride {
   seatsTotal: number;
   seatsTaken: number;
   farePerSeat: number;
+  driverId: string;
   driverName: string;
+  driverRating: { average: number; count: number; ridesCompleted: number; label: string | null } | null;
   createdAt: string;
   myBooking: { id: string; pickupPoint: string; pickupLat: number | null; pickupLng: number | null } | null;
   isFavorited: boolean;
+}
+
+export interface RideHistoryEntry {
+  id: string;
+  origin: string;
+  destination: string;
+  departureTime: string;
+  type: "shared-taxi" | "student-driver";
+  isDriver: boolean;
+  counterparts: { userId: string; name: string; alreadyRated: boolean }[];
 }
 
 export interface NewRideInput {
@@ -59,6 +71,47 @@ export function fetchRides(token?: string | null): Promise<{ rides: Ride[] }> {
 
 export function fetchRecommendedRides(token: string): Promise<{ rides: Ride[] }> {
   return request("/rides/recommended", undefined, token);
+}
+
+export function fetchRideHistory(token: string): Promise<{ history: RideHistoryEntry[] }> {
+  return request("/rides/history", undefined, token);
+}
+
+export interface PickupSuggestion {
+  pickupPoint: string;
+  count: number;
+  lat: number | null;
+  lng: number | null;
+}
+
+export function fetchPickupSuggestions(token: string): Promise<{ suggestions: PickupSuggestion[] }> {
+  return request("/rides/pickup-suggestions", undefined, token);
+}
+
+export interface RecurringPattern {
+  origin: string;
+  destination: string;
+  university: string;
+  count: number;
+  typicalHour: number;
+}
+
+export function fetchRecurringPatterns(token: string): Promise<{ patterns: RecurringPattern[] }> {
+  return request("/rides/recurring", undefined, token);
+}
+
+export function submitRating(
+  rideId: string,
+  ratedUserId: string,
+  score: number,
+  comment: string | undefined,
+  token: string,
+): Promise<{ rating: unknown }> {
+  return request(
+    `/rides/${rideId}/ratings`,
+    { method: "POST", body: JSON.stringify({ ratedUserId, score, comment }) },
+    token,
+  );
 }
 
 export function createRide(input: NewRideInput, token: string): Promise<{ ride: Ride }> {

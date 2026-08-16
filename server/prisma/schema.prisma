@@ -16,10 +16,12 @@ model User {
   university   String
   createdAt    DateTime @default(now())
 
-  rides        Ride[]
-  chatMessages ChatMessage[]
-  bookings     Booking[]
-  favorites    Favorite[]
+  rides           Ride[]
+  chatMessages    ChatMessage[]
+  bookings        Booking[]
+  favorites       Favorite[]
+  ratingsGiven    Rating[] @relation("RatingsGiven")
+  ratingsReceived Rating[] @relation("RatingsReceived")
 }
 
 model Ride {
@@ -43,6 +45,7 @@ model Ride {
 
   bookings  Booking[]
   favorites Favorite[]
+  ratings   Rating[]
 }
 
 model Booking {
@@ -73,6 +76,24 @@ model Favorite {
   userId String
 
   @@unique([userId, rideId])
+}
+
+model Rating {
+  id        String   @id @default(cuid())
+  score     Int
+  comment   String?
+  createdAt DateTime @default(now())
+
+  ride   Ride   @relation(fields: [rideId], references: [id])
+  rideId String
+
+  rater   User   @relation("RatingsGiven", fields: [raterId], references: [id])
+  raterId String
+
+  rated   User   @relation("RatingsReceived", fields: [ratedId], references: [id])
+  ratedId String
+
+  @@unique([rideId, raterId, ratedId])
 }
 
 model ChatMessage {

@@ -1,9 +1,24 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { cancelBooking, createRide, fetchRecommendedRides, fetchRides, joinRide, toggleFavorite, type Ride } from "../lib/api";
+import {
+  cancelBooking,
+  createRide,
+  fetchPickupSuggestions,
+  fetchRecommendedRides,
+  fetchRecurringPatterns,
+  fetchRideHistory,
+  fetchRides,
+  joinRide,
+  submitRating,
+  toggleFavorite,
+  type PickupSuggestion,
+  type RecurringPattern,
+  type Ride,
+  type RideHistoryEntry,
+} from "../lib/api";
 import { useAuth } from "../context/AuthContext";
 import PickupMapPicker, { type LatLng } from "../components/rides/PickupMapPicker";
-import { haversineKm, estimateFairFare } from "../lib/geo";
+import { haversineKm, estimateFairFare, isRushHour } from "../lib/geo";
 
 const CANCELLATION_FEE = 50;
 
@@ -53,12 +68,22 @@ export default function RidesPage() {
   const [showOriginMap, setShowOriginMap] = useState(false);
   const [showDestMap, setShowDestMap] = useState(false);
   const [fareManuallySet, setFareManuallySet] = useState(false);
+  const [waitMinutes, setWaitMinutes] = useState(0);
+  const [rideHistory, setRideHistory] = useState<RideHistoryEntry[]>([]);
+  const [pickupSuggestions, setPickupSuggestions] = useState<PickupSuggestion[]>([]);
+  const [recurringPatterns, setRecurringPatterns] = useState<RecurringPattern[]>([]);
+  const [ratingDrafts, setRatingDrafts] = useState<Record<string, { score: number; comment: string }>>({});
+  const [ratingBusyKey, setRatingBusyKey] = useState<string | null>(null);
 
   const suggestedFare = useMemo(() => {
     if (!originLocation || !destLocation) return null;
     const distanceKm = haversineKm(originLocation.lat, originLocation.lng, destLocation.lat, destLocation.lng);
-    return { distanceKm, fare: estimateFairFare(distanceKm) };
-  }, [originLocation, destLocation]);
+    const departure = form.departureTime ? new Date(form.departureTime) : undefined;
+    const tripFare = estimateFairFare(distanceKm, waitMinutes, departure);
+    const perSeat =
+      form.type === "student-driver" ? Math.round(tripFare / Math.max(1, form.seatsTotal)) : tripFare;
+    return { distanceKm, tripFare, fare: perSeat, isRush: departure ? isRushHour(departure) : false };
+  }, [originLocation, destLocation, waitMinutes, form.type, form.seatsTotal, form.departureTime]);
 
   useEffect(() => {
     if (suggestedFare && !fareManuallySet) {
@@ -88,6 +113,74 @@ export default function RidesPage() {
       .then((data) => setRecommendedRides(data.rides))
       .catch(() => setRecommendedRides([]));
   }, [token, rides]);
+
+  function loadRideHistory() {
+    if (!token) {
+      setRideHistory([]);
+      return;
+    }
+    fetchRideHistory(token)
+      .then((data) => setRideHistory(data.history))
+      .catch(() => setRideHistory([]));
+  }
+
+  useEffect(() => {
+    loadRideHistory();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token]);
+
+  useEffect(() => {
+    if (!token) {
+      setPickupSuggestions([]);
+      return;
+    }
+    fetchPickupSuggestions(token)
+      .then((data) => setPickupSuggestions(data.suggestions))
+      .catch(() => setPickupSuggestions([]));
+  }, [token]);
+
+  useEffect(() => {
+    if (!token) {
+      setRecurringPatterns([]);
+      return;
+    }
+    fetchRecurringPatterns(token)
+      .then((data) => setRecurringPatterns(data.patterns))
+      .catch(() => setRecurringPatterns([]));
+  }, [token]);
+
+  function applyPickupSuggestion(s: PickupSuggestion) {
+    setPickupPoint(s.pickupPoint);
+    if (s.lat !== null && s.lng !== null) setPickupLocation({ lat: s.lat, lng: s.lng });
+  }
+
+  function applyRecurringPattern(p: RecurringPattern) {
+    setForm((f) => ({ ...f, origin: p.origin, destination: p.destination, university: p.university }));
+    document.getElementById("create")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  function formatHour(hour: number): string {
+    const period = hour >= 12 ? "PM" : "AM";
+    const h12 = hour % 12 === 0 ? 12 : hour % 12;
+    return `${h12} ${period}`;
+  }
+
+  async function handleSubmitRating(rideId: string, ratedUserId: string) {
+    if (!token) return;
+    const key = `${rideId}:${ratedUserId}`;
+    const draft = ratingDrafts[key] ?? { score: 5, comment: "" };
+    setRatingBusyKey(key);
+    setError(null);
+    try {
+      await submitRating(rideId, ratedUserId, draft.score, draft.comment || undefined, token);
+      setNotice("Thanks for the feedback!");
+      loadRideHistory();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not submit rating.");
+    } finally {
+      setRatingBusyKey(null);
+    }
+  }
 
   useEffect(() => {
     if (!location.hash) return;
@@ -228,6 +321,50 @@ export default function RidesPage() {
         </div>
       )}
 
+      {recurringPatterns.length > 0 && (
+        <div style={{ marginBottom: 24 }}>
+          {recurringPatterns.map((p) => (
+            <div
+              key={`${p.origin}|${p.destination}`}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                flexWrap: "wrap",
+                gap: 12,
+                background: "#eff6ff",
+                border: "1px solid #bfdbfe",
+                borderRadius: 12,
+                padding: "12px 16px",
+                marginBottom: 8,
+              }}
+            >
+              <div style={{ fontSize: 13, color: "#1e3a8a" }}>
+                🔁 You've ridden <strong>{p.origin} → {p.destination}</strong> around{" "}
+                <strong>{formatHour(p.typicalHour)}</strong> {p.count} times — looks like a regular commute.
+              </div>
+              <button
+                type="button"
+                onClick={() => applyRecurringPattern(p)}
+                style={{
+                  background: "#1d4ed8",
+                  color: "white",
+                  border: "none",
+                  padding: "8px 16px",
+                  borderRadius: 20,
+                  fontWeight: 700,
+                  fontSize: 13,
+                  cursor: "pointer",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                Use this route
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
       <div id="create" style={{ scrollMarginTop: 100 }}>
         {user ? (
           <form
@@ -323,6 +460,20 @@ export default function RidesPage() {
               <input
                 type="number"
                 min={0}
+                placeholder="Expected wait time (minutes)"
+                value={waitMinutes}
+                onChange={(e) => setWaitMinutes(Number(e.target.value))}
+                style={inputStyle}
+              />
+              <span style={{ fontSize: 11.5, color: "#8b968f" }}>
+                Only if you expect to wait — e.g. picking up multiple people along the way
+              </span>
+            </div>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+              <input
+                type="number"
+                min={0}
                 placeholder="Fare per seat (BDT)"
                 value={form.farePerSeat}
                 onChange={(e) => {
@@ -333,8 +484,25 @@ export default function RidesPage() {
               />
               {suggestedFare && (
                 <span style={{ fontSize: 11.5, color: "#8b968f" }}>
-                  Suggested: ৳{suggestedFare.fare} for {suggestedFare.distanceKm.toFixed(1)} km (pin both origin and
-                  destination for a fair-fare estimate)
+                  {form.type === "student-driver" ? (
+                    <>
+                      Suggested: ৳{suggestedFare.tripFare} total for {suggestedFare.distanceKm.toFixed(1)} km, split
+                      across {form.seatsTotal} seat{form.seatsTotal === 1 ? "" : "s"} → ৳{suggestedFare.fare}/seat
+                    </>
+                  ) : (
+                    <>
+                      Suggested: ৳{suggestedFare.fare} for {suggestedFare.distanceKm.toFixed(1)} km
+                    </>
+                  )}
+                  {suggestedFare.isRush && (
+                    <>
+                      {" "}
+                      <span style={{ color: "#b45309", fontWeight: 700 }}>
+                        includes +30% rush-hour pricing
+                      </span>
+                    </>
+                  )}{" "}
+                  (pin both origin and destination for a fair-fare estimate) — edit above to set your own price
                 </span>
               )}
             </div>
@@ -437,6 +605,28 @@ export default function RidesPage() {
                 {joiningRideId === ride.id && (
                   <div style={{ marginTop: 12, display: "grid", gap: 8 }}>
                     <PickupMapPicker value={pickupLocation} onChange={setPickupLocation} />
+                    {pickupSuggestions.length > 0 && (
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                        {pickupSuggestions.map((s) => (
+                          <button
+                            key={s.pickupPoint}
+                            type="button"
+                            onClick={() => applyPickupSuggestion(s)}
+                            style={{
+                              background: "#f0fdf4",
+                              border: "1px solid #bbf7d0",
+                              color: "#166534",
+                              borderRadius: 14,
+                              padding: "4px 10px",
+                              fontSize: 12,
+                              cursor: "pointer",
+                            }}
+                          >
+                            📍 {s.pickupPoint} ({s.count}×)
+                          </button>
+                        ))}
+                      </div>
+                    )}
                     <input
                       autoFocus
                       placeholder="Pickup point label"
@@ -476,6 +666,94 @@ export default function RidesPage() {
                 )}
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {token && rideHistory.some((h) => h.counterparts.some((c) => !c.alreadyRated)) && (
+        <div style={{ marginBottom: 32 }}>
+          <h2 style={{ fontSize: 20, marginBottom: 4 }}>Rate your past rides</h2>
+          <p style={{ color: "#8b968f", fontSize: 13, marginBottom: 16 }}>
+            Your feedback builds trust scores for drivers and riders across RideMate
+          </p>
+          <div style={{ display: "grid", gap: 12 }}>
+            {rideHistory
+              .filter((h) => h.counterparts.some((c) => !c.alreadyRated))
+              .map((h) =>
+                h.counterparts
+                  .filter((c) => !c.alreadyRated)
+                  .map((c) => {
+                    const key = `${h.id}:${c.userId}`;
+                    const draft = ratingDrafts[key] ?? { score: 5, comment: "" };
+                    const busy = ratingBusyKey === key;
+                    return (
+                      <div
+                        key={key}
+                        style={{
+                          border: "1px solid #fde68a",
+                          background: "#fffbeb",
+                          borderRadius: 12,
+                          padding: 16,
+                        }}
+                      >
+                        <div style={{ fontWeight: 700, fontSize: 14 }}>
+                          {h.origin} → {h.destination}
+                        </div>
+                        <div style={{ color: "#555", fontSize: 13, marginBottom: 8 }}>
+                          {new Date(h.departureTime).toLocaleDateString()} · Rate {h.isDriver ? "rider" : "driver"}{" "}
+                          <strong>{c.name}</strong>
+                        </div>
+                        <div style={{ display: "flex", gap: 4, marginBottom: 8 }}>
+                          {[1, 2, 3, 4, 5].map((n) => (
+                            <button
+                              key={n}
+                              type="button"
+                              onClick={() =>
+                                setRatingDrafts((d) => ({ ...d, [key]: { ...draft, score: n } }))
+                              }
+                              style={{
+                                background: "none",
+                                border: "none",
+                                cursor: "pointer",
+                                fontSize: 22,
+                                lineHeight: 1,
+                                padding: 0,
+                                color: n <= draft.score ? "#f59e0b" : "#d1d5db",
+                              }}
+                              aria-label={`${n} star${n === 1 ? "" : "s"}`}
+                            >
+                              ★
+                            </button>
+                          ))}
+                        </div>
+                        <input
+                          placeholder="Optional comment"
+                          value={draft.comment}
+                          onChange={(e) =>
+                            setRatingDrafts((d) => ({ ...d, [key]: { ...draft, comment: e.target.value } }))
+                          }
+                          style={{ ...inputStyle, fontSize: 13, marginBottom: 8 }}
+                        />
+                        <button
+                          onClick={() => handleSubmitRating(h.id, c.userId)}
+                          disabled={busy}
+                          style={{
+                            background: "#16a34a",
+                            color: "white",
+                            border: "none",
+                            padding: "8px 18px",
+                            borderRadius: 20,
+                            fontWeight: 700,
+                            fontSize: 13,
+                            cursor: "pointer",
+                          }}
+                        >
+                          {busy ? "Submitting..." : "Submit rating"}
+                        </button>
+                      </div>
+                    );
+                  }),
+              )}
           </div>
         </div>
       )}
@@ -570,7 +848,30 @@ export default function RidesPage() {
                       {ride.type === "shared-taxi" ? "Shared Taxi Ride" : "Student Driver Ride"}
                     </div>
                     <div style={{ color: "#555", fontSize: 14 }}>
-                      Driver: {ride.driverName} · {ride.seatsTaken}/{ride.seatsTotal} seats taken · ৳{ride.farePerSeat}/seat
+                      Driver: {ride.driverName}{" "}
+                      {ride.driverRating ? (
+                        <span style={{ color: "#b45309" }}>
+                          ★ {ride.driverRating.average.toFixed(1)} ({ride.driverRating.count})
+                          {ride.driverRating.label && (
+                            <span
+                              style={{
+                                marginLeft: 6,
+                                fontSize: 11,
+                                fontWeight: 700,
+                                color: ride.driverRating.label === "Highly reliable" ? "#166534" : "#991b1b",
+                                background: ride.driverRating.label === "Highly reliable" ? "#dcfce7" : "#fee2e2",
+                                padding: "2px 8px",
+                                borderRadius: 10,
+                              }}
+                            >
+                              {ride.driverRating.label}
+                            </span>
+                          )}
+                        </span>
+                      ) : (
+                        <span style={{ color: "#9ca3af" }}>· New driver</span>
+                      )}{" "}
+                      · {ride.seatsTaken}/{ride.seatsTotal} seats taken · ৳{ride.farePerSeat}/seat
                     </div>
                     {ride.myBooking && (
                       <div style={{ color: "#166534", fontSize: 14, marginTop: 6, fontWeight: 600 }}>
