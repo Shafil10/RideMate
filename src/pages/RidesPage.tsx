@@ -9,6 +9,7 @@ import {
   fetchRideHistory,
   fetchRides,
   joinRide,
+  reverseGeocode,
   submitRating,
   toggleFavorite,
   type PickupSuggestion,
@@ -17,7 +18,9 @@ import {
   type RideHistoryEntry,
 } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
+import { Geolocation } from "@capacitor/geolocation";
 import PickupMapPicker, { type LatLng } from "../components/rides/PickupMapPicker";
+import AddressAutocomplete from "../components/rides/AddressAutocomplete";
 import { haversineKm, estimateFairFare, isRushHour } from "../lib/geo";
 
 const CANCELLATION_FEE = 50;
@@ -67,8 +70,9 @@ export default function RidesPage() {
   const [destLocation, setDestLocation] = useState<LatLng | null>(null);
   const [showOriginMap, setShowOriginMap] = useState(false);
   const [showDestMap, setShowDestMap] = useState(false);
+  const [locatingOrigin, setLocatingOrigin] = useState(false);
+  const [originLocateError, setOriginLocateError] = useState<string | null>(null);
   const [fareManuallySet, setFareManuallySet] = useState(false);
-  const [waitMinutes, setWaitMinutes] = useState(0);
   const [rideHistory, setRideHistory] = useState<RideHistoryEntry[]>([]);
   const [pickupSuggestions, setPickupSuggestions] = useState<PickupSuggestion[]>([]);
   const [recurringPatterns, setRecurringPatterns] = useState<RecurringPattern[]>([]);
@@ -79,11 +83,11 @@ export default function RidesPage() {
     if (!originLocation || !destLocation) return null;
     const distanceKm = haversineKm(originLocation.lat, originLocation.lng, destLocation.lat, destLocation.lng);
     const departure = form.departureTime ? new Date(form.departureTime) : undefined;
-    const tripFare = estimateFairFare(distanceKm, waitMinutes, departure);
+    const tripFare = estimateFairFare(distanceKm, departure);
     const perSeat =
       form.type === "student-driver" ? Math.round(tripFare / Math.max(1, form.seatsTotal)) : tripFare;
     return { distanceKm, tripFare, fare: perSeat, isRush: departure ? isRushHour(departure) : false };
-  }, [originLocation, destLocation, waitMinutes, form.type, form.seatsTotal, form.departureTime]);
+  }, [originLocation, destLocation, form.type, form.seatsTotal, form.departureTime]);
 
   useEffect(() => {
     if (suggestedFare && !fareManuallySet) {
@@ -152,6 +156,23 @@ export default function RidesPage() {
   function applyPickupSuggestion(s: PickupSuggestion) {
     setPickupPoint(s.pickupPoint);
     if (s.lat !== null && s.lng !== null) setPickupLocation({ lat: s.lat, lng: s.lng });
+  }
+
+  async function useOriginCurrentLocation() {
+    setLocatingOrigin(true);
+    setOriginLocateError(null);
+    try {
+      const pos = await Geolocation.getCurrentPosition({ enableHighAccuracy: true, timeout: 8000 });
+      const lat = pos.coords.latitude;
+      const lng = pos.coords.longitude;
+      setOriginLocation({ lat, lng });
+      const { label } = await reverseGeocode(lat, lng);
+      setForm((f) => ({ ...f, origin: label ?? `${lat.toFixed(5)}, ${lng.toFixed(5)}` }));
+    } catch {
+      setOriginLocateError("Couldn't get your location — try typing your address instead.");
+    } finally {
+      setLocatingOrigin(false);
+    }
   }
 
   function applyRecurringPattern(p: RecurringPattern) {
@@ -393,31 +414,49 @@ export default function RidesPage() {
 
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
               <div style={{ display: "flex", gap: 8 }}>
-                <input
-                  placeholder="Origin"
+                <AddressAutocomplete
+                  placeholder="Origin — start typing an address"
                   value={form.origin}
-                  onChange={(e) => setForm({ ...form, origin: e.target.value })}
-                  style={{ ...inputStyle, flex: 1 }}
+                  onChange={(text) => setForm({ ...form, origin: text })}
+                  onSelectLocation={(loc) => {
+                    setForm({ ...form, origin: loc.label });
+                    setOriginLocation({ lat: loc.lat, lng: loc.lng });
+                  }}
+                  style={{ ...inputStyle, width: "100%" }}
                   required
                 />
+                <button
+                  type="button"
+                  onClick={useOriginCurrentLocation}
+                  disabled={locatingOrigin}
+                  title="Use my current location"
+                  style={pinToggleStyle(!!originLocation)}
+                >
+                  {locatingOrigin ? "Locating…" : originLocation ? "📍 Set" : "📍 Use current"}
+                </button>
                 <button
                   type="button"
                   onClick={() => setShowOriginMap((v) => !v)}
                   style={pinToggleStyle(!!originLocation)}
                 >
-                  {originLocation ? "📍 Pinned" : "📍 Pin"}
+                  Map
                 </button>
               </div>
+              {originLocateError && <span style={{ fontSize: 11.5, color: "#991b1b" }}>{originLocateError}</span>}
               {showOriginMap && <PickupMapPicker value={originLocation} onChange={setOriginLocation} />}
             </div>
 
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
               <div style={{ display: "flex", gap: 8 }}>
-                <input
-                  placeholder="Destination"
+                <AddressAutocomplete
+                  placeholder="Destination — start typing an address"
                   value={form.destination}
-                  onChange={(e) => setForm({ ...form, destination: e.target.value })}
-                  style={{ ...inputStyle, flex: 1 }}
+                  onChange={(text) => setForm({ ...form, destination: text })}
+                  onSelectLocation={(loc) => {
+                    setForm({ ...form, destination: loc.label });
+                    setDestLocation({ lat: loc.lat, lng: loc.lng });
+                  }}
+                  style={{ ...inputStyle, width: "100%" }}
                   required
                 />
                 <button
@@ -425,7 +464,7 @@ export default function RidesPage() {
                   onClick={() => setShowDestMap((v) => !v)}
                   style={pinToggleStyle(!!destLocation)}
                 >
-                  {destLocation ? "📍 Pinned" : "📍 Pin"}
+                  {destLocation ? "📍 Pinned" : "Map"}
                 </button>
               </div>
               {showDestMap && <PickupMapPicker value={destLocation} onChange={setDestLocation} />}
@@ -456,19 +495,6 @@ export default function RidesPage() {
               style={inputStyle}
             />
 
-            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-              <input
-                type="number"
-                min={0}
-                placeholder="Expected wait time (minutes)"
-                value={waitMinutes}
-                onChange={(e) => setWaitMinutes(Number(e.target.value))}
-                style={inputStyle}
-              />
-              <span style={{ fontSize: 11.5, color: "#8b968f" }}>
-                Only if you expect to wait — e.g. picking up multiple people along the way
-              </span>
-            </div>
 
             <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
               <input
@@ -502,7 +528,13 @@ export default function RidesPage() {
                       </span>
                     </>
                   )}{" "}
-                  (pin both origin and destination for a fair-fare estimate) — edit above to set your own price
+                  — edit the fare above anytime to set your own fixed price
+                </span>
+              )}
+              {!suggestedFare && (
+                <span style={{ fontSize: 11.5, color: "#b45309", fontWeight: 600 }}>
+                  📍 Tap "Pin" on both Origin and Destination above and place them on the map to
+                  auto-calculate a fair fare — otherwise the fare stays at whatever you type here.
                 </span>
               )}
             </div>
