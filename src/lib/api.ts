@@ -1,6 +1,11 @@
 import { Capacitor } from "@capacitor/core";
 
-const API_BASE = Capacitor.isNativePlatform() ? "http://localhost:4000/api" : "/api";
+// On the emulator, "localhost" is tunneled back to the dev machine via `adb reverse`.
+// A real phone has no such tunnel — it needs the dev machine's actual LAN IP,
+// which must be set in .env (VITE_API_HOST) since it changes per network.
+const API_BASE = Capacitor.isNativePlatform()
+  ? `http://${import.meta.env.VITE_API_HOST || "localhost"}:4000/api`
+  : "/api";
 
 export interface Ride {
   id: string;
@@ -98,6 +103,20 @@ export interface RecurringPattern {
 
 export function fetchRecurringPatterns(token: string): Promise<{ patterns: RecurringPattern[] }> {
   return request("/rides/recurring", undefined, token);
+}
+
+export interface GeocodeResult {
+  label: string;
+  lat: number;
+  lng: number;
+}
+
+export function searchPlaces(query: string): Promise<{ results: GeocodeResult[] }> {
+  return request(`/geocode/search?q=${encodeURIComponent(query)}`);
+}
+
+export function reverseGeocode(lat: number, lng: number): Promise<{ label: string | null }> {
+  return request(`/geocode/reverse?lat=${lat}&lng=${lng}`);
 }
 
 export function submitRating(

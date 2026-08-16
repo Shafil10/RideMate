@@ -11,7 +11,6 @@ export function haversineKm(lat1: number, lng1: number, lat2: number, lng2: numb
 
 const BASE_FARE = 100;
 const RATE_PER_KM = 30;
-const RATE_PER_WAIT_MINUTE = 5;
 
 // Dhaka's typical school/office rush windows. No live traffic feed — this is an
 // explainable time-of-day heuristic, not a black-box prediction.
@@ -22,8 +21,11 @@ export function isRushHour(departureTime: Date): boolean {
   return (hour >= 8 && hour < 10) || (hour >= 17 && hour < 20);
 }
 
-export function estimateFairFare(distanceKm: number, waitMinutes = 0, departureTime?: Date): number {
-  const subtotal = BASE_FARE + distanceKm * RATE_PER_KM + waitMinutes * RATE_PER_WAIT_MINUTE;
+// Fully automatic: recalculates live from distance and departure time, no manual
+// input required. (A per-minute wait-time meter belongs on a live, in-progress
+// ride, not a pre-ride estimate — dropped after user testing found it confusing.)
+export function estimateFairFare(distanceKm: number, departureTime?: Date): number {
+  const subtotal = BASE_FARE + distanceKm * RATE_PER_KM;
   const multiplier = departureTime && isRushHour(departureTime) ? RUSH_HOUR_MULTIPLIER : 1;
   return Math.round(subtotal * multiplier);
 }
