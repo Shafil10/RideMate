@@ -13,7 +13,18 @@ const topics: Topic[] = [
   },
   {
     id: "join-ride",
-    keywords: ["join ride", "join a ride", "book a seat", "find a ride", "search ride", "book ride", "book a ride"],
+    keywords: [
+      "join ride",
+      "join a ride",
+      "book a seat",
+      "find a ride",
+      "search ride",
+      "search for a ride",
+      "search for available",
+      "available ride",
+      "book ride",
+      "book a ride",
+    ],
     reply:
       "Head to the Rides page to browse available rides filtered by university and route. Tap 'Join' on any ride with open seats to reserve your spot.",
   },
@@ -31,9 +42,9 @@ const topics: Topic[] = [
   },
   {
     id: "ai-features",
-    keywords: ["ai", "matching", "recommend", "prediction", "smart"],
+    keywords: ["ai feature", "artificial intelligence", "the ai", "matching", "recommend", "prediction", "smart"],
     reply:
-      "AI-powered route matching, fair fare calculation, reliability prediction, smart pickup suggestions, recurring ride prediction, and traffic-aware cost estimation are on our roadmap for upcoming sprints.",
+      "RideMate's AI features are live: geographic route matching, fair fare calculation (with rush-hour pricing), reliability scores from real ratings, smart pickup-point suggestions, and recurring-ride detection. Trust & safety enhancements are next on the roadmap.",
   },
   {
     id: "universities",
