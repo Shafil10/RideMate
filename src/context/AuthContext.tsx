@@ -1,14 +1,25 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import type { ReactNode } from "react";
-import { login as loginRequest, signup as signupRequest, type AuthUser } from "../lib/api";
+import {
+  login as loginRequest,
+  signup as signupRequest,
+  updateDefaultRole,
+  type AuthUser,
+  type UserRole,
+} from "../lib/api";
 
 interface AuthContextValue {
   user: AuthUser | null;
   token: string | null;
   loading: boolean;
+  // True once the initial localStorage read has completed (whether or not a
+  // session was found) — the app's "ready to render real content" signal, used
+  // to gate the splash screen's minimum-visible timer.
+  hydrated: boolean;
   login: (email: string, password: string) => Promise<void>;
-  signup: (name: string, email: string, password: string, university: string) => Promise<void>;
+  signup: (name: string, email: string, password: string, university: string, defaultRole: UserRole) => Promise<void>;
   logout: () => void;
+  setDefaultRole: (role: UserRole) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -19,6 +30,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
     const stored = localStorage.getItem(STORAGE_KEY);
@@ -31,6 +43,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         localStorage.removeItem(STORAGE_KEY);
       }
     }
+    setHydrated(true);
   }, []);
 
   async function login(email: string, password: string) {
@@ -45,10 +58,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  async function signup(name: string, email: string, password: string, university: string) {
+  async function signup(name: string, email: string, password: string, university: string, defaultRole: UserRole) {
     setLoading(true);
     try {
-      const { token, user } = await signupRequest(name, email, password, university);
+      const { token, user } = await signupRequest(name, email, password, university, defaultRole);
       localStorage.setItem(STORAGE_KEY, JSON.stringify({ token, user }));
       setUser(user);
       setToken(token);
@@ -63,8 +76,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setToken(null);
   }
 
+  async function setDefaultRole(role: UserRole) {
+    if (!token) return;
+    const { user: updated } = await updateDefaultRole(role, token);
+    setUser(updated);
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...parsed, user: updated }));
+    }
+  }
+
   return (
-    <AuthContext.Provider value={{ user, token, loading, login, signup, logout }}>{children}</AuthContext.Provider>
+    <AuthContext.Provider value={{ user, token, loading, hydrated, login, signup, logout, setDefaultRole }}>
+      {children}
+    </AuthContext.Provider>
   );
 }
 

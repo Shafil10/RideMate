@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { prisma } from "../prisma.js";
 import { requireAuth, optionalAuth } from "../middleware/auth.js";
-import { haversineKm } from "../lib/geo.js";
+import { haversineKm, matchToRoute, estimateFairFare } from "../lib/geo.js";
 
 const router = Router();
 
@@ -73,7 +73,16 @@ function serializeRide(
     driverId: string;
     driver: { name: string };
   },
-  myBooking?: { id: string; pickupPoint: string; pickupLat: number | null; pickupLng: number | null } | null,
+  myBooking?: {
+    id: string;
+    pickupPoint: string;
+    pickupLat: number | null;
+    pickupLng: number | null;
+    dropoffPoint?: string | null;
+    dropoffLat?: number | null;
+    dropoffLng?: number | null;
+    fare?: number | null;
+  } | null,
   isFavorited = false,
   driverRating?: { average: number; count: number; ridesCompleted: number; label: string | null } | null,
 ) {
@@ -106,7 +115,10 @@ router.get("/", optionalAuth, async (req, res) => {
       driver: { select: { name: true } },
       bookings: {
         where: { status: "confirmed" },
-        select: { id: true, pickupPoint: true, pickupLat: true, pickupLng: true, riderId: true },
+        select: {
+          id: true, pickupPoint: true, pickupLat: true, pickupLng: true,
+          dropoffPoint: true, dropoffLat: true, dropoffLng: true, fare: true, riderId: true,
+        },
       },
       favorites: req.user ? { where: { userId: req.user.sub }, select: { id: true } } : false,
     },
@@ -121,6 +133,47 @@ router.get("/", optionalAuth, async (req, res) => {
       const isFavorited = "favorites" in ride ? ride.favorites.length > 0 : false;
       return serializeRide(ride, myBooking, isFavorited, ratingMap.get(ride.driverId) ?? null);
     }),
+  });
+});
+
+// A driver's own rides with the full passenger list (not just the caller's own
+// booking, unlike GET / and /recommended) — powers the per-passenger fare
+// breakdown on the "My Offered Rides" screen.
+router.get("/mine", requireAuth, async (req, res) => {
+  const userId = req.user!.sub;
+
+  const rides = await prisma.ride.findMany({
+    where: { driverId: userId },
+    include: {
+      driver: { select: { name: true } },
+      bookings: {
+        where: { status: "confirmed" },
+        select: {
+          id: true, riderId: true, pickupPoint: true, pickupLat: true, pickupLng: true,
+          dropoffPoint: true, dropoffLat: true, dropoffLng: true, fare: true,
+          rider: { select: { name: true } },
+        },
+      },
+    },
+    orderBy: { departureTime: "desc" },
+  });
+
+  res.json({
+    rides: rides.map((ride) => ({
+      ...serializeRide(ride),
+      bookings: ride.bookings.map((b) => ({
+        id: b.id,
+        riderId: b.riderId,
+        riderName: b.rider.name,
+        pickupPoint: b.pickupPoint,
+        pickupLat: b.pickupLat,
+        pickupLng: b.pickupLng,
+        dropoffPoint: b.dropoffPoint,
+        dropoffLat: b.dropoffLat,
+        dropoffLng: b.dropoffLng,
+        fare: b.fare ?? ride.farePerSeat,
+      })),
+    })),
   });
 });
 
@@ -164,7 +217,10 @@ router.get("/recommended", requireAuth, async (req, res) => {
       driver: { select: { name: true } },
       bookings: {
         where: { status: "confirmed" },
-        select: { id: true, riderId: true, pickupPoint: true, pickupLat: true, pickupLng: true },
+        select: {
+          id: true, riderId: true, pickupPoint: true, pickupLat: true, pickupLng: true,
+          dropoffPoint: true, dropoffLat: true, dropoffLng: true, fare: true,
+        },
       },
       favorites: { where: { userId }, select: { id: true } },
     },
@@ -225,8 +281,38 @@ router.post("/", requireAuth, async (req, res) => {
   res.status(201).json({ ride: serializeRide(ride) });
 });
 
+// Computes a fair per-passenger fare from how much of the driver's route this
+// rider actually uses. Falls back to the ride's flat farePerSeat when we don't
+// have enough coordinates to place the rider on the route — e.g. a caller that
+// hasn't been rebuilt to send a dropoff point yet, or a ride with no pinned
+// origin/destination. This keeps existing point-to-point joins unchanged.
+export function computeSegmentFare(
+  ride: { originLat: number | null; originLng: number | null; destLat: number | null; destLng: number | null; departureTime: Date; farePerSeat: number },
+  pickup: { lat: number | null; lng: number | null },
+  dropoff: { lat: number | null; lng: number | null } | null,
+): number | null {
+  if (
+    ride.originLat === null || ride.originLng === null || ride.destLat === null || ride.destLng === null ||
+    pickup.lat === null || pickup.lng === null || !dropoff || dropoff.lat === null || dropoff.lng === null
+  ) {
+    return null;
+  }
+
+  const routeStart = { lat: ride.originLat, lng: ride.originLng };
+  const routeEnd = { lat: ride.destLat, lng: ride.destLng };
+  const routeDistanceKm = haversineKm(routeStart.lat, routeStart.lng, routeEnd.lat, routeEnd.lng);
+
+  const pickupMatch = matchToRoute({ lat: pickup.lat, lng: pickup.lng }, routeStart, routeEnd);
+  const dropoffMatch = matchToRoute({ lat: dropoff.lat, lng: dropoff.lng }, routeStart, routeEnd);
+
+  if (dropoffMatch.t <= pickupMatch.t) return null; // dropoff isn't ahead of pickup — can't be a valid segment
+
+  const segmentKm = routeDistanceKm * (dropoffMatch.t - pickupMatch.t);
+  return estimateFairFare(segmentKm, ride.departureTime);
+}
+
 router.post("/:id/join", requireAuth, async (req, res) => {
-  const { pickupPoint, pickupLat, pickupLng } = req.body ?? {};
+  const { pickupPoint, pickupLat, pickupLng, dropoffPoint, dropoffLat, dropoffLng } = req.body ?? {};
 
   if (!pickupPoint || !String(pickupPoint).trim()) {
     return res.status(400).json({ error: "A pickup point on the ride's route is required." });
@@ -250,14 +336,30 @@ router.post("/:id/join", requireAuth, async (req, res) => {
     return res.status(409).json({ error: "You already have a booking on this ride." });
   }
 
+  const pickupLatNum = typeof pickupLat === "number" ? pickupLat : null;
+  const pickupLngNum = typeof pickupLng === "number" ? pickupLng : null;
+  const dropoffLatNum = typeof dropoffLat === "number" ? dropoffLat : null;
+  const dropoffLngNum = typeof dropoffLng === "number" ? dropoffLng : null;
+  const hasDropoff = dropoffPoint && String(dropoffPoint).trim();
+
+  const fare = computeSegmentFare(
+    ride,
+    { lat: pickupLatNum, lng: pickupLngNum },
+    hasDropoff ? { lat: dropoffLatNum, lng: dropoffLngNum } : null,
+  );
+
   const [booking, updated] = await prisma.$transaction([
     prisma.booking.create({
       data: {
         rideId: ride.id,
         riderId: req.user!.sub,
         pickupPoint: String(pickupPoint).trim(),
-        pickupLat: typeof pickupLat === "number" ? pickupLat : null,
-        pickupLng: typeof pickupLng === "number" ? pickupLng : null,
+        pickupLat: pickupLatNum,
+        pickupLng: pickupLngNum,
+        dropoffPoint: hasDropoff ? String(dropoffPoint).trim() : null,
+        dropoffLat: hasDropoff ? dropoffLatNum : null,
+        dropoffLng: hasDropoff ? dropoffLngNum : null,
+        fare,
       },
     }),
     prisma.ride.update({
@@ -273,6 +375,10 @@ router.post("/:id/join", requireAuth, async (req, res) => {
       pickupPoint: booking.pickupPoint,
       pickupLat: booking.pickupLat,
       pickupLng: booking.pickupLng,
+      dropoffPoint: booking.dropoffPoint,
+      dropoffLat: booking.dropoffLat,
+      dropoffLng: booking.dropoffLng,
+      fare: booking.fare ?? ride.farePerSeat,
     }),
   });
 });

@@ -6,6 +6,7 @@ import chatbotRouter from "./routes/chatbot.js";
 import authRouter from "./routes/auth.js";
 import contentRouter from "./routes/content.js";
 import geocodeRouter from "./routes/geocode.js";
+import rideRequestsRouter from "./routes/rideRequests.js";
 
 const app = express();
 const PORT = process.env.PORT ? Number(process.env.PORT) : 4000;
@@ -22,6 +23,7 @@ app.use("/api/chatbot", chatbotRouter);
 app.use("/api/auth", authRouter);
 app.use("/api/content", contentRouter);
 app.use("/api/geocode", geocodeRouter);
+app.use("/api/ride-requests", rideRequestsRouter);
 
 app.listen(PORT, () => {
   console.log(`RideMate API listening on http://localhost:${PORT}`);

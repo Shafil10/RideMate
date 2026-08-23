@@ -1,14 +1,25 @@
-@import "tailwindcss";
-
 /* Google Font */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Baloo+2:wght@500;600;700;800&display=swap');
 
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+@import "tailwindcss";
 
 :root{
 
     --primary:#16A34A;
+    --primary-dark:#15803D;
+    --primary-light:#DCFCE7;
 
     --secondary:#22C55E;
+
+    --driver:#2563EB;
+    --driver-dark:#1D4ED8;
+    --driver-light:#DBEAFE;
+
+    --accent:#F59E0B;
+    --accent-light:#FEF3C7;
+
+    --danger:#DC2626;
+    --danger-light:#FEE2E2;
 
     --background:#F8FAFC;
 
@@ -16,8 +27,35 @@
 
     --text:#111827;
 
+    --text-muted:#64748B;
+
     --gray:#64748B;
 
+    --border:#E5E7EB;
+
+}
+
+/* Bridges the brand vars above into real Tailwind utilities:
+   bg-primary, text-primary, border-border, rounded-card, etc. */
+@theme {
+    --color-primary: var(--primary);
+    --color-primary-dark: var(--primary-dark);
+    --color-primary-light: var(--primary-light);
+    --color-secondary: var(--secondary);
+    --color-driver: var(--driver);
+    --color-driver-dark: var(--driver-dark);
+    --color-driver-light: var(--driver-light);
+    --color-accent: var(--accent);
+    --color-accent-light: var(--accent-light);
+    --color-danger: var(--danger);
+    --color-danger-light: var(--danger-light);
+    --color-background: var(--background);
+    --color-card: var(--card);
+    --color-text: var(--text);
+    --color-text-muted: var(--text-muted);
+    --color-border: var(--border);
+    --font-display: 'Baloo 2', 'Inter', sans-serif;
+    --font-sans: 'Inter', sans-serif;
 }
 
 *{

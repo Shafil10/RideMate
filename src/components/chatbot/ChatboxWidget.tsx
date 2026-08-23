@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import { MessageCircle, X, Send } from "lucide-react";
 import { sendChatMessage } from "../../lib/api";
 import { useAuth } from "../../context/AuthContext";
@@ -62,113 +63,65 @@ export default function ChatboxWidget() {
   }
 
   return (
-    <div className="chatbox-widget" style={{ position: "fixed", bottom: 24, right: 24, zIndex: 1000 }}>
-      {open && (
-        <div
-          className="chatbox-panel"
-          style={{
-            height: 460,
-            background: "white",
-            borderRadius: 16,
-            boxShadow: "0 12px 40px rgba(0,0,0,0.18)",
-            display: "flex",
-            flexDirection: "column",
-            marginBottom: 16,
-            overflow: "hidden",
-            border: "1px solid #ececec",
-          }}
-        >
-          <div
-            style={{
-              background: "#16a34a",
-              color: "white",
-              padding: "16px 20px",
-              fontWeight: 700,
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-            }}
+    <div className="fixed right-5 z-[1000]" style={{ bottom: "max(calc(env(safe-area-inset-bottom) + 84px), 96px)" }}>
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            initial={{ opacity: 0, y: 16, scale: 0.96 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 16, scale: 0.96 }}
+            transition={{ type: "spring", damping: 26, stiffness: 320 }}
+            className="h-[440px] w-[min(90vw,340px)] bg-card rounded-3xl shadow-[0_16px_48px_rgba(15,23,42,0.22)] flex flex-col overflow-hidden border border-border/60 mb-4"
           >
-            RideMate Helpline
-            <button
-              onClick={() => setOpen(false)}
-              aria-label="Close chat"
-              style={{ background: "none", border: "none", color: "white", cursor: "pointer", display: "flex" }}
-            >
-              <X size={18} />
-            </button>
-          </div>
+            <div className="bg-primary text-white px-5 py-4 font-bold font-display flex items-center justify-between">
+              RideMate Helpline
+              <button onClick={() => setOpen(false)} aria-label="Close chat" className="text-white/90">
+                <X size={18} />
+              </button>
+            </div>
 
-          <div ref={bodyRef} style={{ flex: 1, padding: 16, overflowY: "auto", display: "flex", flexDirection: "column", gap: 10 }}>
-            {messages.map((m) => (
-              <div
-                key={m.id}
-                style={{
-                  alignSelf: m.sender === "user" ? "flex-end" : "flex-start",
-                  background: m.sender === "user" ? "#16a34a" : "#f3f4f6",
-                  color: m.sender === "user" ? "white" : "#111827",
-                  padding: "10px 14px",
-                  borderRadius: 14,
-                  maxWidth: "85%",
-                  fontSize: 14,
-                  lineHeight: 1.4,
-                }}
+            <div ref={bodyRef} className="flex-1 p-4 overflow-y-auto flex flex-col gap-2.5">
+              {messages.map((m) => (
+                <div
+                  key={m.id}
+                  className={`max-w-[85%] rounded-2xl px-3.5 py-2.5 text-sm leading-snug ${
+                    m.sender === "user" ? "self-end bg-primary text-white" : "self-start bg-slate-100 text-text"
+                  }`}
+                >
+                  {m.text}
+                </div>
+              ))}
+              {sending && <div className="self-start text-text-muted text-xs">Helpline is typing…</div>}
+            </div>
+
+            <form onSubmit={handleSend} className="flex border-t border-border/60 p-2 gap-2">
+              <input
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                placeholder="Type your question..."
+                className="flex-1 border-none outline-none px-3 py-2.5 text-sm bg-transparent"
+              />
+              <button
+                type="submit"
+                disabled={sending}
+                aria-label="Send message"
+                className="h-10 w-10 rounded-full bg-primary text-white grid place-items-center disabled:opacity-50 shrink-0"
               >
-                {m.text}
-              </div>
-            ))}
-            {sending && (
-              <div style={{ alignSelf: "flex-start", color: "#9ca3af", fontSize: 13 }}>Helpline is typing...</div>
-            )}
-          </div>
+                <Send size={16} />
+              </button>
+            </form>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-          <form onSubmit={handleSend} style={{ display: "flex", borderTop: "1px solid #ececec", padding: 8, gap: 8 }}>
-            <input
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              placeholder="Type your question..."
-              style={{ flex: 1, border: "none", outline: "none", padding: "10px 12px", fontSize: 14 }}
-            />
-            <button
-              type="submit"
-              disabled={sending}
-              aria-label="Send message"
-              style={{
-                background: "#16a34a",
-                border: "none",
-                borderRadius: "50%",
-                width: 40,
-                height: 40,
-                display: "grid",
-                placeItems: "center",
-                color: "white",
-                cursor: "pointer",
-              }}
-            >
-              <Send size={16} />
-            </button>
-          </form>
-        </div>
-      )}
-
-      <button
+      <motion.button
+        whileTap={{ scale: 0.92 }}
         onClick={() => setOpen((v) => !v)}
         aria-label="Toggle helpline chat"
-        style={{
-          width: 60,
-          height: 60,
-          borderRadius: "50%",
-          background: "#16a34a",
-          color: "white",
-          border: "none",
-          boxShadow: "0 8px 24px rgba(0,0,0,0.25)",
-          cursor: "pointer",
-          display: "grid",
-          placeItems: "center",
-        }}
+        className="h-14 w-14 rounded-full bg-primary text-white grid place-items-center shadow-[0_10px_28px_rgba(22,163,74,0.4)]"
       >
         {open ? <X size={24} /> : <MessageCircle size={24} />}
-      </button>
+      </motion.button>
     </div>
   );
 }

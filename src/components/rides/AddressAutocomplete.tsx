@@ -14,6 +14,7 @@ export default function AddressAutocomplete({ value, onChange, onSelectLocation,
   const [results, setResults] = useState<GeocodeResult[]>([]);
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const skipNextSearch = useRef(false);
@@ -27,16 +28,19 @@ export default function AddressAutocomplete({ value, onChange, onSelectLocation,
     if (value.trim().length < 3) {
       setResults([]);
       setOpen(false);
+      setError(null);
       return;
     }
     debounceRef.current = setTimeout(() => {
       setLoading(true);
+      setError(null);
       searchPlaces(value.trim())
         .then((data) => {
           setResults(data.results);
           setOpen(data.results.length > 0);
+          if (data.results.length === 0) setError("No matches — check your spelling or use the map instead.");
         })
-        .catch(() => setResults([]))
+        .catch(() => setError("Couldn't reach the server — check your connection and try again."))
         .finally(() => setLoading(false));
     }, 450);
     return () => {
@@ -78,6 +82,9 @@ export default function AddressAutocomplete({ value, onChange, onSelectLocation,
         <span style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", fontSize: 11, color: "#8b968f" }}>
           searching…
         </span>
+      )}
+      {!loading && error && (
+        <div style={{ fontSize: 11.5, color: "#991b1b", marginTop: 3 }}>{error}</div>
       )}
       {open && results.length > 0 && (
         <div

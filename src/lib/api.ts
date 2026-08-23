@@ -25,7 +25,16 @@ export interface Ride {
   driverName: string;
   driverRating: { average: number; count: number; ridesCompleted: number; label: string | null } | null;
   createdAt: string;
-  myBooking: { id: string; pickupPoint: string; pickupLat: number | null; pickupLng: number | null } | null;
+  myBooking: {
+    id: string;
+    pickupPoint: string;
+    pickupLat: number | null;
+    pickupLng: number | null;
+    dropoffPoint?: string | null;
+    dropoffLat?: number | null;
+    dropoffLng?: number | null;
+    fare?: number | null;
+  } | null;
   isFavorited: boolean;
 }
 
@@ -76,6 +85,27 @@ export function fetchRides(token?: string | null): Promise<{ rides: Ride[] }> {
 
 export function fetchRecommendedRides(token: string): Promise<{ rides: Ride[] }> {
   return request("/rides/recommended", undefined, token);
+}
+
+export interface RideBooking {
+  id: string;
+  riderId: string;
+  riderName: string;
+  pickupPoint: string;
+  pickupLat: number | null;
+  pickupLng: number | null;
+  dropoffPoint: string | null;
+  dropoffLat: number | null;
+  dropoffLng: number | null;
+  fare: number;
+}
+
+export interface DriverRide extends Ride {
+  bookings: RideBooking[];
+}
+
+export function fetchMyOfferedRides(token: string): Promise<{ rides: DriverRide[] }> {
+  return request("/rides/mine", undefined, token);
 }
 
 export function fetchRideHistory(token: string): Promise<{ history: RideHistoryEntry[] }> {
@@ -137,17 +167,17 @@ export function createRide(input: NewRideInput, token: string): Promise<{ ride: 
   return request("/rides", { method: "POST", body: JSON.stringify(input) }, token);
 }
 
-export function joinRide(
-  id: string,
-  pickupPoint: string,
-  token: string,
-  location?: { lat: number; lng: number } | null,
-): Promise<{ ride: Ride }> {
-  return request(
-    `/rides/${id}/join`,
-    { method: "POST", body: JSON.stringify({ pickupPoint, pickupLat: location?.lat, pickupLng: location?.lng }) },
-    token,
-  );
+export interface JoinRideInput {
+  pickupPoint: string;
+  pickupLat?: number | null;
+  pickupLng?: number | null;
+  dropoffPoint?: string | null;
+  dropoffLat?: number | null;
+  dropoffLng?: number | null;
+}
+
+export function joinRide(id: string, input: JoinRideInput, token: string): Promise<{ ride: Ride }> {
+  return request(`/rides/${id}/join`, { method: "POST", body: JSON.stringify(input) }, token);
 }
 
 export function cancelBooking(id: string, token: string): Promise<{ ride: Ride; cancellationFee: number }> {
@@ -158,6 +188,110 @@ export function toggleFavorite(id: string, token: string): Promise<{ isFavorited
   return request(`/rides/${id}/favorite`, { method: "POST" }, token);
 }
 
+export interface RideRequestParticipant {
+  id: string;
+  riderId: string;
+  riderName: string;
+  pickupPoint: string;
+  pickupLat: number | null;
+  pickupLng: number | null;
+  dropoffPoint: string;
+  dropoffLat: number | null;
+  dropoffLng: number | null;
+}
+
+export interface RideRequest {
+  id: string;
+  origin: string;
+  originLat: number | null;
+  originLng: number | null;
+  destination: string;
+  destLat: number | null;
+  destLng: number | null;
+  university: string;
+  desiredTime: string;
+  status: "open" | "fulfilled" | "cancelled";
+  createdAt: string;
+  initiatorId: string;
+  initiatorName: string;
+  fulfilledByRideId: string | null;
+  seatsNeeded: number;
+  participants: RideRequestParticipant[];
+}
+
+export interface NewRideRequestInput {
+  origin: string;
+  originLat?: number | null;
+  originLng?: number | null;
+  destination: string;
+  destLat?: number | null;
+  destLng?: number | null;
+  university: string;
+  desiredTime: string;
+  pickupPoint: string;
+  pickupLat?: number | null;
+  pickupLng?: number | null;
+  dropoffPoint: string;
+  dropoffLat?: number | null;
+  dropoffLng?: number | null;
+}
+
+export function createRideRequest(input: NewRideRequestInput, token: string): Promise<{ request: RideRequest }> {
+  return request("/ride-requests", { method: "POST", body: JSON.stringify(input) }, token);
+}
+
+export function fetchRideRequests(university?: string): Promise<{ requests: RideRequest[] }> {
+  const qs = university ? `?university=${encodeURIComponent(university)}` : "";
+  return request(`/ride-requests${qs}`);
+}
+
+export function fetchMyRideRequests(token: string): Promise<{ requests: RideRequest[] }> {
+  return request("/ride-requests/mine", undefined, token);
+}
+
+export function fetchNearbyRideRequests(
+  route: { originLat: number; originLng: number; destLat: number; destLng: number; university?: string },
+  token: string,
+): Promise<{ requests: RideRequest[] }> {
+  const qs = new URLSearchParams({
+    originLat: String(route.originLat),
+    originLng: String(route.originLng),
+    destLat: String(route.destLat),
+    destLng: String(route.destLng),
+    ...(route.university ? { university: route.university } : {}),
+  });
+  return request(`/ride-requests/nearby?${qs.toString()}`, undefined, token);
+}
+
+export interface JoinRideRequestInput {
+  pickupPoint: string;
+  pickupLat?: number | null;
+  pickupLng?: number | null;
+  dropoffPoint: string;
+  dropoffLat?: number | null;
+  dropoffLng?: number | null;
+}
+
+export function joinRideRequest(
+  id: string,
+  input: JoinRideRequestInput,
+  token: string,
+): Promise<{ request: RideRequest }> {
+  return request(`/ride-requests/${id}/join`, { method: "POST", body: JSON.stringify(input) }, token);
+}
+
+export function fulfillRideRequest(
+  id: string,
+  input: { rideId?: string; type?: Ride["type"]; seatsTotal?: number; farePerSeat?: number },
+  token: string,
+): Promise<{ request: RideRequest; rideId: string }> {
+  return request(`/ride-requests/${id}/fulfill`, { method: "POST", body: JSON.stringify(input) }, token);
+}
+
+export function cancelRideRequest(id: string, token: string): Promise<{ request: RideRequest }> {
+  return request(`/ride-requests/${id}/cancel`, { method: "POST" }, token);
+}
+
 export function sendChatMessage(
   message: string,
   sessionId: string,
@@ -166,11 +300,14 @@ export function sendChatMessage(
   return request("/chatbot/message", { method: "POST", body: JSON.stringify({ message, sessionId }) }, token);
 }
 
+export type UserRole = "passenger" | "driver";
+
 export interface AuthUser {
   id: string;
   name: string;
   email: string;
   university: string;
+  defaultRole: UserRole;
 }
 
 export function login(email: string, password: string): Promise<{ token: string; user: AuthUser }> {
@@ -182,8 +319,16 @@ export function signup(
   email: string,
   password: string,
   university: string,
+  defaultRole: UserRole,
 ): Promise<{ token: string; user: AuthUser }> {
-  return request("/auth/signup", { method: "POST", body: JSON.stringify({ name, email, password, university }) });
+  return request("/auth/signup", {
+    method: "POST",
+    body: JSON.stringify({ name, email, password, university, defaultRole }),
+  });
+}
+
+export function updateDefaultRole(defaultRole: UserRole, token: string): Promise<{ user: AuthUser }> {
+  return request("/auth/me", { method: "PATCH", body: JSON.stringify({ defaultRole }) }, token);
 }
 
 export interface Stat {

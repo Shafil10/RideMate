@@ -14,14 +14,20 @@ model User {
   email        String   @unique
   passwordHash String
   university   String
+  // "passenger" | "driver" — a soft UI default only (which home screen a user lands
+  // on after login), never checked as a server-side authorization gate. Anyone can
+  // still offer or request a ride regardless of this value.
+  defaultRole  String   @default("passenger")
   createdAt    DateTime @default(now())
 
-  rides           Ride[]
-  chatMessages    ChatMessage[]
-  bookings        Booking[]
-  favorites       Favorite[]
-  ratingsGiven    Rating[] @relation("RatingsGiven")
-  ratingsReceived Rating[] @relation("RatingsReceived")
+  rides            Ride[]
+  chatMessages     ChatMessage[]
+  bookings         Booking[]
+  favorites        Favorite[]
+  ratingsGiven     Rating[]                 @relation("RatingsGiven")
+  ratingsReceived  Rating[]                 @relation("RatingsReceived")
+  rideRequests     RideRequest[]            @relation("RideRequestInitiator")
+  requestBookings  RideRequestParticipant[]
 }
 
 model Ride {
@@ -43,9 +49,10 @@ model Ride {
   driver   User   @relation(fields: [driverId], references: [id])
   driverId String
 
-  bookings  Booking[]
-  favorites Favorite[]
-  ratings   Rating[]
+  bookings         Booking[]
+  favorites        Favorite[]
+  ratings          Rating[]
+  fulfilledRequest RideRequest?
 }
 
 model Booking {
@@ -53,6 +60,12 @@ model Booking {
   pickupPoint     String
   pickupLat       Float?
   pickupLng       Float?
+  dropoffPoint    String?
+  dropoffLat      Float?
+  dropoffLng      Float?
+  // Segment fare snapshot, computed once at join time and never recomputed later —
+  // same pattern as cancellationFee below.
+  fare            Int?
   status          String    @default("confirmed") // "confirmed" | "cancelled"
   cancellationFee Int?
   createdAt       DateTime  @default(now())
@@ -76,6 +89,52 @@ model Favorite {
   userId String
 
   @@unique([userId, rideId])
+}
+
+// A passenger-initiated request for a ride that doesn't exist yet — other
+// passengers can pool onto it, and driver-students can browse open requests and
+// fulfill one if their schedule/seats match. On fulfillment, a real Ride + one
+// real Booking per participant get created, so it plugs into the existing
+// rating/history/recommendation machinery with no changes to that code.
+model RideRequest {
+  id          String   @id @default(cuid())
+  origin      String
+  originLat   Float?
+  originLng   Float?
+  destination String
+  destLat     Float?
+  destLng     Float?
+  university  String
+  desiredTime DateTime
+  status      String   @default("open") // "open" | "fulfilled" | "cancelled"
+  createdAt   DateTime @default(now())
+
+  initiator   User   @relation("RideRequestInitiator", fields: [initiatorId], references: [id])
+  initiatorId String
+
+  fulfilledByRide   Ride?   @relation(fields: [fulfilledByRideId], references: [id])
+  fulfilledByRideId String? @unique
+
+  participants RideRequestParticipant[]
+}
+
+model RideRequestParticipant {
+  id           String   @id @default(cuid())
+  pickupPoint  String
+  pickupLat    Float?
+  pickupLng    Float?
+  dropoffPoint String
+  dropoffLat   Float?
+  dropoffLng   Float?
+  createdAt    DateTime @default(now())
+
+  request   RideRequest @relation(fields: [requestId], references: [id])
+  requestId String
+
+  rider   User   @relation(fields: [riderId], references: [id])
+  riderId String
+
+  @@unique([requestId, riderId])
 }
 
 model Rating {

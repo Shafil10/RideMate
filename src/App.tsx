@@ -1,21 +1,70 @@
+import { useEffect, useState } from "react";
 import { Routes, Route } from "react-router-dom";
-import { AuthProvider } from "./context/AuthContext";
+import { AnimatePresence } from "framer-motion";
+import { AuthProvider, useAuth } from "./context/AuthContext";
+import { ToastProvider } from "./components/ui";
+import { setAppStatusBar } from "./lib/statusBar";
 import Navbar from "./components/layout/Navbar";
+import TabShell from "./components/layout/TabShell";
+import RequireAuth from "./components/layout/RequireAuth";
+import RideRedirect from "./components/layout/RideRedirect";
+import SplashScreen from "./components/layout/SplashScreen";
 import LandingPage from "./pages/LandingPage";
-import RidesPage from "./pages/RidesPage";
 import LoginPage from "./pages/LoginPage";
-import ChatboxWidget from "./components/chatbot/ChatboxWidget";
+import PassengerHome from "./pages/passenger/PassengerHome";
+import MyRequests from "./pages/passenger/MyRequests";
+import DriverHome from "./pages/driver/DriverHome";
+import MyOfferedRides from "./pages/driver/MyOfferedRides";
+import ActivityPage from "./pages/ActivityPage";
+import ProfilePage from "./pages/ProfilePage";
+
+function AppRoutes() {
+  const { hydrated } = useAuth();
+  const [splashDone, setSplashDone] = useState(false);
+  const showSplash = !splashDone || !hydrated;
+
+  useEffect(() => {
+    if (!showSplash) setAppStatusBar();
+  }, [showSplash]);
+
+  return (
+    <>
+      <AnimatePresence>{showSplash && <SplashScreen onDone={() => setSplashDone(true)} />}</AnimatePresence>
+
+      {!showSplash && (
+        <Routes>
+          <Route
+            path="/"
+            element={
+              <>
+                <Navbar />
+                <LandingPage />
+              </>
+            }
+          />
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/rides" element={<RideRedirect />} />
+
+          <Route element={<RequireAuth><TabShell /></RequireAuth>}>
+            <Route path="/passenger" element={<PassengerHome />} />
+            <Route path="/passenger/requests" element={<MyRequests />} />
+            <Route path="/driver" element={<DriverHome />} />
+            <Route path="/driver/rides" element={<MyOfferedRides />} />
+            <Route path="/activity" element={<ActivityPage />} />
+            <Route path="/profile" element={<ProfilePage />} />
+          </Route>
+        </Routes>
+      )}
+    </>
+  );
+}
 
 function App() {
   return (
     <AuthProvider>
-      <Navbar />
-      <Routes>
-        <Route path="/" element={<LandingPage />} />
-        <Route path="/rides" element={<RidesPage />} />
-        <Route path="/login" element={<LoginPage />} />
-      </Routes>
-      <ChatboxWidget />
+      <ToastProvider>
+        <AppRoutes />
+      </ToastProvider>
     </AuthProvider>
   );
 }

@@ -12,6 +12,8 @@ export default function Navbar() {
     setMenuOpen(false);
   }
 
+  const homePath = user ? (user.defaultRole === "driver" ? "/driver" : "/passenger") : "/login";
+
   return (
     <nav
       className="navbar"
@@ -74,7 +76,7 @@ export default function Navbar() {
         }}
       >
         <Link to="/" style={{ color: "inherit", textDecoration: "none" }}>Home</Link>
-        <Link to="/rides" style={{ color: "inherit", textDecoration: "none" }}>Find a Ride</Link>
+        <Link to={homePath} style={{ color: "inherit", textDecoration: "none" }}>Find a Ride</Link>
         <a href="#universities">Universities</a>
         <a href="#about">About</a>
       </div>
@@ -121,8 +123,8 @@ export default function Navbar() {
         )}
 
         <Link
-          to={user ? "/rides#create" : "/login"}
-          state={user ? undefined : { from: "/rides#create" }}
+          to={user ? "/driver" : "/login"}
+          state={user ? undefined : { from: "/driver" }}
           style={{
             border: "none",
             background: "#16a34a",
@@ -152,7 +154,7 @@ export default function Navbar() {
 
       <div className={`navbar-mobile-panel${menuOpen ? " open" : ""}`}>
         <Link to="/" onClick={closeMenu} style={{ color: "inherit", textDecoration: "none", fontWeight: 600 }}>Home</Link>
-        <Link to="/rides" onClick={closeMenu} style={{ color: "inherit", textDecoration: "none", fontWeight: 600 }}>Find a Ride</Link>
+        <Link to={homePath} onClick={closeMenu} style={{ color: "inherit", textDecoration: "none", fontWeight: 600 }}>Find a Ride</Link>
         <a href="#universities" onClick={closeMenu} style={{ fontWeight: 600 }}>Universities</a>
         <a href="#about" onClick={closeMenu} style={{ fontWeight: 600 }}>About</a>
 
@@ -176,8 +178,8 @@ export default function Navbar() {
         )}
 
         <Link
-          to={user ? "/rides#create" : "/login"}
-          state={user ? undefined : { from: "/rides#create" }}
+          to={user ? "/driver" : "/login"}
+          state={user ? undefined : { from: "/driver" }}
           onClick={closeMenu}
           style={{
             background: "#16a34a",
