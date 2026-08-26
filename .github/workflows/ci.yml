@@ -33,6 +33,22 @@ jobs:
     defaults:
       run:
         working-directory: server
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/ci"
     steps:
       - uses: actions/checkout@v4
 
@@ -50,15 +66,9 @@ jobs:
 
       - name: Run database migrations
         run: npx prisma migrate deploy
-        env:
-          DATABASE_URL: "file:./ci.db"
 
       - name: Typecheck
         run: npm run typecheck
-        env:
-          DATABASE_URL: "file:./ci.db"
 
       - name: Build
         run: npm run build
-        env:
-          DATABASE_URL: "file:./ci.db"
