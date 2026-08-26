@@ -1,6 +1,6 @@
-# RideMate — 7-Week Sprint Plan
+# RideMate — 8-Week Sprint Plan
 
-One sprint per week, 7 sprints total. Sprints 1–2 are due for demo tomorrow and are already implemented in this repo.
+One sprint per week, 8 sprints total. Sprints 1–2 are due for demo tomorrow and are already implemented in this repo.
 
 Current focus: ship a working **AI Chatbox Helpline** end-to-end first (rule-based now, real-LLM upgrade in Sprint 4). The previously-listed AI ride-matching features (route matching, fair fare calculation, reliability prediction, smart pickup suggestions, recurring ride prediction, traffic-aware cost estimation) are deliberately deferred to Sprints 5–6.
 
@@ -82,19 +82,38 @@ Goal: begin the deferred AI matching feature set.
 ---
 
 ## Sprint 6 (Week 6) — AI Ride Matching, Phase 2 + Trust & Safety
+**Status: ✅ Done**
+
 Goal: complete the AI feature set and add the safety layer that supports it.
 
-- [ ] Reliability prediction (driver/rider score from ride history)
-- [ ] Smart pickup-point suggestions — driver marks their actual intended route (not just origin/destination labels); riders see that path on the map and pick a pickup point that's genuinely on the way, instead of guessing between two endpoints
-- [ ] Recurring-ride prediction (detect regular commute patterns, suggest auto-matching)
-- [ ] Traffic-aware cost estimation (integrate a maps/traffic API)
-- [ ] Trust score + rating UI shown on ride cards and profiles
+- [x] Reliability prediction (driver/rider score from ride history)
+- [x] Smart pickup-point suggestions — driver marks their actual intended route (not just origin/destination labels); riders see that path on the map and pick a pickup point that's genuinely on the way, instead of guessing between two endpoints
+- [x] Recurring-ride prediction (detect regular commute patterns, suggest auto-matching)
+- [x] Traffic-aware cost estimation (integrate a maps/traffic API)
+- [x] Trust score + rating UI shown on ride cards and profiles
 
 **Deliverable:** all six originally-listed AI features live; trust score visible throughout the app.
 
 ---
 
-## Sprint 7 (Week 7) — QA, Polish & Deployment
+## Sprint 7 (Week 7) — Native Mobile App & Polish
+**Status: ✅ Done**
+
+Goal: turn RideMate into a real installable Android app and bring it up to a professional, native feel.
+
+- [x] Convert the app to a Capacitor-based Android app; integrate maps, ride time filtering, and favorites
+- [x] Real device support — fix the APK's network layer (cleartext/security config) and simplify the fare UX for on-device testing
+- [x] Free address autocomplete (no paid API dependency)
+- [x] Branded app icon and cold-boot splash screen, replacing Capacitor's defaults, across every screen density and orientation
+- [x] Skeleton loading states on all data-fetching screens (Passenger Home, Driver Home, My Requests, My Offered Rides, Activity)
+- [x] Haptic feedback on button presses and toast notifications, app-wide
+- [x] Native status bar theming (dark on splash, matches app background elsewhere)
+
+**Deliverable:** a real, installable Android app with a native-feeling, branded experience — not just a wrapped webview.
+
+---
+
+## Sprint 8 (Week 8) — QA, Polish & Deployment
 Goal: stabilize and ship a public beta.
 
 - [ ] End-to-end tests (Playwright/Cypress) for the core ride + chatbot flows
@@ -109,4 +128,4 @@ Goal: stabilize and ship a public beta.
 ---
 
 ## How this maps to the scrum board
-Each checklist item above is one GitHub Projects card. Columns: **Backlog → In Progress → In Review → Done**. Sprint 1 and 2 cards should be moved to **Done** for tomorrow's demo; Sprint 3–7 cards sit in **Backlog**, pulled into **In Progress** one sprint at a time.
+Each checklist item above is one GitHub Projects card. Columns: **Backlog → In Progress → In Review → Done**. Sprint 1 and 2 cards should be moved to **Done** for tomorrow's demo; Sprint 3–8 cards sit in **Backlog**, pulled into **In Progress** one sprint at a time.

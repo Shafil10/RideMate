@@ -3,9 +3,15 @@ import { Capacitor } from "@capacitor/core";
 // On the emulator, "localhost" is tunneled back to the dev machine via `adb reverse`.
 // A real phone has no such tunnel — it needs the dev machine's actual LAN IP,
 // which must be set in .env (VITE_API_HOST) since it changes per network.
+//
+// On the web, "/api" relies on Vite's dev-server proxy (vite.config.ts) and only
+// works when the frontend and backend are on the same origin — true in local dev,
+// not true once the frontend is a static deploy (Vercel) talking to a separately
+// hosted backend (Render). VITE_API_BASE_URL overrides it with the real backend
+// URL for that case; unset in local dev, so "/api" + the proxy keeps working there.
 const API_BASE = Capacitor.isNativePlatform()
   ? `http://${import.meta.env.VITE_API_HOST || "localhost"}:4000/api`
-  : "/api";
+  : import.meta.env.VITE_API_BASE_URL || "/api";
 
 export interface Ride {
   id: string;
@@ -308,22 +314,52 @@ export interface AuthUser {
   email: string;
   university: string;
   defaultRole: UserRole;
+  vehicleMake: string | null;
+  vehicleModel: string | null;
+  vehicleColor: string | null;
+  vehiclePlate: string | null;
+  vehicleSeats: number | null;
+}
+
+export interface VehicleInput {
+  make: string;
+  model: string;
+  color: string;
+  plate: string;
+  seats: number;
 }
 
 export function login(email: string, password: string): Promise<{ token: string; user: AuthUser }> {
   return request("/auth/login", { method: "POST", body: JSON.stringify({ email, password }) });
 }
 
-export function signup(
-  name: string,
+export function startSignup(input: {
+  name: string;
+  email: string;
+  password: string;
+  university: string;
+  defaultRole: UserRole;
+  vehicle?: VehicleInput;
+}): Promise<{ message: string; email: string }> {
+  return request("/auth/signup/start", { method: "POST", body: JSON.stringify(input) });
+}
+
+export function verifySignup(email: string, code: string): Promise<{ token: string; user: AuthUser }> {
+  return request("/auth/signup/verify", { method: "POST", body: JSON.stringify({ email, code }) });
+}
+
+export function startPasswordReset(email: string): Promise<{ message: string; email: string }> {
+  return request("/auth/reset-password/start", { method: "POST", body: JSON.stringify({ email }) });
+}
+
+export function verifyPasswordReset(
   email: string,
-  password: string,
-  university: string,
-  defaultRole: UserRole,
+  code: string,
+  newPassword: string,
 ): Promise<{ token: string; user: AuthUser }> {
-  return request("/auth/signup", {
+  return request("/auth/reset-password/verify", {
     method: "POST",
-    body: JSON.stringify({ name, email, password, university, defaultRole }),
+    body: JSON.stringify({ email, code, newPassword }),
   });
 }
 

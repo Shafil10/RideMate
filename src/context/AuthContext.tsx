@@ -2,10 +2,14 @@ import { createContext, useContext, useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import {
   login as loginRequest,
-  signup as signupRequest,
+  startSignup as startSignupRequest,
+  verifySignup as verifySignupRequest,
+  startPasswordReset as startPasswordResetRequest,
+  verifyPasswordReset as verifyPasswordResetRequest,
   updateDefaultRole,
   type AuthUser,
   type UserRole,
+  type VehicleInput,
 } from "../lib/api";
 
 interface AuthContextValue {
@@ -17,7 +21,17 @@ interface AuthContextValue {
   // to gate the splash screen's minimum-visible timer.
   hydrated: boolean;
   login: (email: string, password: string) => Promise<void>;
-  signup: (name: string, email: string, password: string, university: string, defaultRole: UserRole) => Promise<void>;
+  startSignup: (input: {
+    name: string;
+    email: string;
+    password: string;
+    university: string;
+    defaultRole: UserRole;
+    vehicle?: VehicleInput;
+  }) => Promise<{ email: string }>;
+  verifySignup: (email: string, code: string) => Promise<void>;
+  startPasswordReset: (email: string) => Promise<{ email: string }>;
+  verifyPasswordReset: (email: string, code: string, newPassword: string) => Promise<void>;
   logout: () => void;
   setDefaultRole: (role: UserRole) => Promise<void>;
 }
@@ -58,10 +72,47 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  async function signup(name: string, email: string, password: string, university: string, defaultRole: UserRole) {
+  async function startSignup(input: {
+    name: string;
+    email: string;
+    password: string;
+    university: string;
+    defaultRole: UserRole;
+    vehicle?: VehicleInput;
+  }) {
     setLoading(true);
     try {
-      const { token, user } = await signupRequest(name, email, password, university, defaultRole);
+      return await startSignupRequest(input);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function verifySignup(email: string, code: string) {
+    setLoading(true);
+    try {
+      const { token, user } = await verifySignupRequest(email, code);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ token, user }));
+      setUser(user);
+      setToken(token);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function startPasswordReset(email: string) {
+    setLoading(true);
+    try {
+      return await startPasswordResetRequest(email);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function verifyPasswordReset(email: string, code: string, newPassword: string) {
+    setLoading(true);
+    try {
+      const { token, user } = await verifyPasswordResetRequest(email, code, newPassword);
       localStorage.setItem(STORAGE_KEY, JSON.stringify({ token, user }));
       setUser(user);
       setToken(token);
@@ -88,7 +139,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, token, loading, hydrated, login, signup, logout, setDefaultRole }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        token,
+        loading,
+        hydrated,
+        login,
+        startSignup,
+        verifySignup,
+        startPasswordReset,
+        verifyPasswordReset,
+        logout,
+        setDefaultRole,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );

@@ -4,7 +4,6 @@ import { AnimatePresence } from "framer-motion";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { ToastProvider } from "./components/ui";
 import { setAppStatusBar } from "./lib/statusBar";
-import Navbar from "./components/layout/Navbar";
 import TabShell from "./components/layout/TabShell";
 import RequireAuth from "./components/layout/RequireAuth";
 import RideRedirect from "./components/layout/RideRedirect";
@@ -33,16 +32,9 @@ function AppRoutes() {
 
       {!showSplash && (
         <Routes>
-          <Route
-            path="/"
-            element={
-              <>
-                <Navbar />
-                <LandingPage />
-              </>
-            }
-          />
+          <Route path="/" element={<LoginPage />} />
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/about" element={<LandingPage />} />
           <Route path="/rides" element={<RideRedirect />} />
 
           <Route element={<RequireAuth><TabShell /></RequireAuth>}>

@@ -4,7 +4,7 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
@@ -20,6 +20,13 @@ model User {
   defaultRole  String   @default("passenger")
   createdAt    DateTime @default(now())
 
+  // Driver-only vehicle details, collected at signup. Null for passengers.
+  vehicleMake  String?
+  vehicleModel String?
+  vehicleColor String?
+  vehiclePlate String?
+  vehicleSeats Int?
+
   rides            Ride[]
   chatMessages     ChatMessage[]
   bookings         Booking[]
@@ -28,6 +35,44 @@ model User {
   ratingsReceived  Rating[]                 @relation("RatingsReceived")
   rideRequests     RideRequest[]            @relation("RideRequestInitiator")
   requestBookings  RideRequestParticipant[]
+}
+
+// Holds a signup until its OTP is verified — kept separate from User so an
+// abandoned or mistyped-code attempt never squats the unique email on the
+// real, joined-everywhere User table. Promoted to a real User row (and
+// deleted) on successful verification.
+model PendingSignup {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String
+  passwordHash String
+  university   String
+  defaultRole  String   @default("passenger")
+
+  vehicleMake  String?
+  vehicleModel String?
+  vehicleColor String?
+  vehiclePlate String?
+  vehicleSeats Int?
+
+  otpCode      String
+  otpExpiresAt DateTime
+  attempts     Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+// Holds a "forgot password" OTP until verified — same shape/lifecycle as
+// PendingSignup, kept separate since it's tied to an *existing* User rather
+// than staging a new one.
+model PasswordReset {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  otpCode      String
+  otpExpiresAt DateTime
+  attempts     Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 }
 
 model Ride {

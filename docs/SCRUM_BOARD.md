@@ -1,7 +1,7 @@
 # RideMate — Scrum Board (GitHub Projects)
 
 Board: **RideMate Dev** (GitHub Projects, board view). Columns: `Backlog` → `In Progress` → `In Review` → `Done`.
-Each line below is one card/issue. Sprint number is a label on the card (`sprint-1` … `sprint-7`).
+Each line below is one card/issue. Sprint number is a label on the card (`sprint-1` … `sprint-8`).
 
 ## Done (Sprint 1)
 - [x] Initialize git repo + `.gitignore`
@@ -38,14 +38,22 @@ Each line below is one card/issue. Sprint number is a label on the card (`sprint
 - [ ] Fair fare calculation (distance/time-based)
 - [ ] "Recommended rides for you" on Rides page
 
-## Backlog (Sprint 6 — AI Ride Matching, Phase 2 + Trust/Safety)
-- [ ] Reliability prediction score
-- [ ] Smart pickup-point suggestions
-- [ ] Recurring-ride prediction
-- [ ] Traffic-aware cost estimation
-- [ ] Trust score + rating UI
+## Done (Sprint 6 — AI Ride Matching, Phase 2 + Trust/Safety)
+- [x] Reliability prediction score
+- [x] Smart pickup-point suggestions
+- [x] Recurring-ride prediction
+- [x] Traffic-aware cost estimation
+- [x] Trust score + rating UI
 
-## Backlog (Sprint 7 — QA, Polish & Deployment)
+## Done (Sprint 7 — Native Mobile App & Polish)
+- [x] Convert to Capacitor Android app; integrate maps, time filtering, favorites
+- [x] Real device support: fix APK network layer, free address autocomplete, simplified fare UX
+- [x] Branded app icon + cold-boot splash screen (all densities/orientations)
+- [x] Skeleton loading states on data-fetching screens
+- [x] Haptic feedback on buttons + toast notifications
+- [x] Native status bar theming
+
+## Backlog (Sprint 8 — QA, Polish & Deployment)
 - [ ] E2E tests (Playwright/Cypress) for ride + chatbot flows
 - [ ] Backend integration tests
 - [ ] Accessibility & performance pass
