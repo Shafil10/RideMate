@@ -187,7 +187,7 @@ export default function LoginPage() {
                 </div>
                 <div>
                   <div className="font-display font-bold text-text">I'm a Passenger</div>
-                  <div className="text-xs text-text-muted mt-0.5">Find and join rides to campus</div>
+                  <div className="text-xs text-primary-dark mt-0.5">Find and join rides to campus</div>
                 </div>
               </motion.button>
 
@@ -205,7 +205,7 @@ export default function LoginPage() {
                 </div>
                 <div>
                   <div className="font-display font-bold text-text">I offer rides</div>
-                  <div className="text-xs text-text-muted mt-0.5">Drive and pick up fellow students</div>
+                  <div className="text-xs text-driver-dark mt-0.5">Drive and pick up fellow students</div>
                 </div>
               </motion.button>
 

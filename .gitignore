@@ -43,3 +43,8 @@ android/app/src/main/assets/capacitor.config.json
 *.sw?
 .vercel
 .env*
+
+# Playwright
+test-results/
+playwright-report/
+blob-report/

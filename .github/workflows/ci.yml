@@ -28,7 +28,7 @@ jobs:
         run: npm run build
 
   backend:
-    name: Backend (typecheck, build)
+    name: Backend (typecheck, test, build)
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -69,6 +69,9 @@ jobs:
 
       - name: Typecheck
         run: npm run typecheck
+
+      - name: Test
+        run: npm test
 
       - name: Build
         run: npm run build

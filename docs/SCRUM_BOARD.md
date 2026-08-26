@@ -53,12 +53,14 @@ Each line below is one card/issue. Sprint number is a label on the card (`sprint
 - [x] Haptic feedback on buttons + toast notifications
 - [x] Native status bar theming
 
-## Backlog (Sprint 8 — QA, Polish & Deployment)
-- [ ] E2E tests (Playwright/Cypress) for ride + chatbot flows
-- [ ] Backend integration tests
-- [ ] Accessibility & performance pass
-- [ ] Deploy backend + frontend, wire env vars/domain
-- [ ] Auto-deploy job in CI/CD
+## Done (Sprint 8 — QA, Polish & Deployment)
+- [x] E2E tests (Playwright) for auth + chatbot flows, plus axe-core accessibility scans
+- [x] Backend integration tests (Vitest + Supertest), running in CI
+- [x] Accessibility & performance pass (contrast fix + route-level code-splitting)
+- [x] Deploy backend (Render) + frontend (Vercel), env vars wired
+- [x] Auto-deploy on push to `main` (native Render/Vercel GitHub integration)
+
+## Backlog (Sprint 8 — carried over)
 - [ ] Sprint review + retrospective
 
 ---

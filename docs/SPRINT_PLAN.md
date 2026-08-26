@@ -114,16 +114,18 @@ Goal: turn RideMate into a real installable Android app and bring it up to a pro
 ---
 
 ## Sprint 8 (Week 8) — QA, Polish & Deployment
+**Status: ✅ Done**
+
 Goal: stabilize and ship a public beta.
 
-- [ ] End-to-end tests (Playwright/Cypress) for the core ride + chatbot flows
-- [ ] Backend integration tests
-- [ ] Accessibility and performance pass
-- [ ] Deploy backend (Render/Railway) and frontend (Vercel/Netlify); wire env vars + domain
-- [ ] Add a deploy job to CI/CD (auto-deploy on merge to `main`)
-- [ ] Sprint review, retrospective, and demo-day prep
+- [x] End-to-end tests (Playwright) for the core flows — login, wrong-password handling, driver signup's vehicle-details step, chatbot, logout, plus two automated accessibility (axe-core) scans. Run locally via `npm run test:e2e`; not wired into CI (would need browser install + seeded DB + AI-provider secrets in the pipeline — judged not worth the CI time for this project's scale)
+- [x] Backend integration tests (Vitest + Supertest) — auth (login, signup/OTP, password reset) and rides (create/list/auth-gating) routes; run in CI on every push
+- [x] Accessibility and performance pass — axe-core scans caught a real WCAG AA color-contrast failure on the role-select cards (fixed); route-level code-splitting (`React.lazy`) cut the main JS bundle from 613KB to 405KB and eliminated Vite's chunk-size warning
+- [x] Deployed: backend on Render (`ridemate-api`, Singapore, Postgres via Neon), frontend on Vercel — both auto-deploy from `main`
+- [x] CI/CD auto-deploy — handled natively by Render's and Vercel's GitHub integrations (no custom deploy job needed); existing GitHub Actions CI (lint/typecheck/test/build) gates every push
+- [ ] Sprint review, retrospective, and demo-day prep — not yet done
 
-**Deliverable:** a deployed, tested, publicly reachable beta.
+**Deliverable:** a deployed, tested, publicly reachable beta. ✅ Live at the Vercel/Render URLs.
 
 ---
 
