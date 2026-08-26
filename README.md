@@ -34,3 +34,4 @@ See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rule
 =======
 # RideMate
 >>>>>>> 6adce3f5d3411ea7fe90e91d61a32c8e0bb1b5b5
+
