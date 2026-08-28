@@ -18,8 +18,8 @@ export default function ProfilePage() {
       await setDefaultRole(role);
       showToast(`Switched to ${role} mode`);
       navigate(role === "driver" ? "/driver" : "/passenger");
-    } catch {
-      showToast("Couldn't switch roles — try again.", "error");
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Couldn't switch roles — try again.", "error");
     }
   }
 
