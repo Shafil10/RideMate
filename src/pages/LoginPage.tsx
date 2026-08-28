@@ -21,7 +21,6 @@ export default function LoginPage() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [university, setUniversity] = useState("");
   const [vehicleMake, setVehicleMake] = useState("");
   const [vehicleModel, setVehicleModel] = useState("");
   const [vehicleColor, setVehicleColor] = useState("");
@@ -61,7 +60,6 @@ export default function LoginPage() {
         name,
         email,
         password,
-        university,
         defaultRole: role ?? "passenger",
         vehicle,
       });
@@ -258,13 +256,9 @@ export default function LoginPage() {
                   required
                 />
                 {mode === "signup" && (
-                  <Input
-                    label="University"
-                    value={university}
-                    onChange={(e) => setUniversity(e.target.value)}
-                    placeholder="e.g. North South University"
-                    required
-                  />
+                  <p className="text-xs text-text-muted -mt-2">
+                    Your university is detected automatically from this email — sign up with the one your school gave you.
+                  </p>
                 )}
                 <Input
                   label="Password"

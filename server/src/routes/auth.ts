@@ -2,7 +2,8 @@ import { Router } from "express";
 import bcrypt from "bcryptjs";
 import { prisma } from "../prisma.js";
 import { signToken, requireAuth } from "../middleware/auth.js";
-import { isResendConfigured, sendOtpEmail, sendPasswordResetEmail } from "../email/resend.js";
+import { isEmailConfigured, sendOtpEmail, sendPasswordResetEmail } from "../email/sender.js";
+import { resolveUniversityFromEmail } from "../lib/universityDomains.js";
 
 const router = Router();
 
@@ -40,14 +41,23 @@ function generateOtp(): string {
 }
 
 router.post("/signup/start", async (req, res) => {
-  const { name, email, password, university, defaultRole, vehicle } = req.body ?? {};
+  const { name, email, password, defaultRole, vehicle } = req.body ?? {};
 
-  if (!name || !email || !password || !university) {
-    return res.status(400).json({ error: "Name, email, password, and university are required." });
+  if (!name || !email || !password) {
+    return res.status(400).json({ error: "Name, email, and password are required." });
   }
 
   const role = defaultRole === "driver" ? "driver" : "passenger";
   const normalizedEmail = String(email).toLowerCase();
+
+  // University is derived from the email domain, not typed freely — this both
+  // blocks non-university signups (gmail.com etc.) and keeps every student at
+  // the same school stored under one exact string, which route-matching relies
+  // on ("NSU" vs "North South University" would otherwise never match).
+  const university = resolveUniversityFromEmail(normalizedEmail);
+  if (!university) {
+    return res.status(400).json({ error: "Please sign up with a valid university email address (e.g. you@northsouth.edu)." });
+  }
 
   if (role === "driver") {
     if (!vehicle || !vehicle.make || !vehicle.model || !vehicle.color || !vehicle.plate || !vehicle.seats) {
@@ -55,7 +65,7 @@ router.post("/signup/start", async (req, res) => {
     }
   }
 
-  if (!isResendConfigured()) {
+  if (!isEmailConfigured()) {
     return res.status(500).json({ error: "Email verification is not configured on the server." });
   }
 
@@ -172,7 +182,7 @@ router.post("/reset-password/start", async (req, res) => {
     return res.status(404).json({ error: "No account found with that email." });
   }
 
-  if (!isResendConfigured()) {
+  if (!isEmailConfigured()) {
     return res.status(500).json({ error: "Email verification is not configured on the server." });
   }
 

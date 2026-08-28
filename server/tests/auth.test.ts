@@ -4,8 +4,8 @@ import bcrypt from "bcryptjs";
 
 const capturedOtps = new Map<string, string>();
 
-vi.mock("../src/email/resend.js", () => ({
-  isResendConfigured: () => true,
+vi.mock("../src/email/sender.js", () => ({
+  isEmailConfigured: () => true,
   sendOtpEmail: vi.fn(async (to: string, _name: string, code: string) => {
     capturedOtps.set(to, code);
   }),
@@ -18,7 +18,11 @@ const { default: app } = await import("../src/app.js");
 const { prisma } = await import("../src/prisma.js");
 
 const TEST_EMAIL_PREFIX = "vitest-";
-const runId = Date.now();
+// Random suffix, not just Date.now(), because module-level init across parallel
+// test files can land in the same millisecond — a bare timestamp collided with
+// rideRequests.test.ts's run id and made this file's broad cleanup sweep up (and
+// fail to delete, via a RESTRICT FK) rows that file had created.
+const runId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
 function testEmail(label: string) {
   return `${TEST_EMAIL_PREFIX}${label}-${runId}@nsu.edu.bd`;
@@ -36,10 +40,18 @@ beforeAll(async () => {
   });
 });
 
+// Scoped to this run's emails (the random runId, not just the shared "vitest-"
+// prefix) so it can't sweep up rows created by other test files running against
+// the same database, some of which are FK-referenced (e.g. RideRequest) and
+// would fail this deleteMany with a RESTRICT violation. Matched via "contains"
+// rather than "endsWith" — some tests below use non-"@nsu.edu.bd" emails on
+// purpose (domain validation tests), so the runId isn't always at the very end.
+const runMarker = `-${runId}`;
+
 afterAll(async () => {
-  await prisma.pendingSignup.deleteMany({ where: { email: { startsWith: TEST_EMAIL_PREFIX } } });
-  await prisma.passwordReset.deleteMany({ where: { email: { startsWith: TEST_EMAIL_PREFIX } } });
-  await prisma.user.deleteMany({ where: { email: { startsWith: TEST_EMAIL_PREFIX } } });
+  await prisma.pendingSignup.deleteMany({ where: { email: { contains: runMarker } } });
+  await prisma.passwordReset.deleteMany({ where: { email: { contains: runMarker } } });
+  await prisma.user.deleteMany({ where: { email: { contains: runMarker } } });
   await prisma.$disconnect();
 });
 
@@ -134,6 +146,51 @@ describe("POST /api/auth/signup/start + /verify", () => {
       defaultRole: "passenger",
     });
     expect(res.status).toBe(409);
+  });
+});
+
+describe("Signup email domain validation", () => {
+  it("rejects a non-university email domain", async () => {
+    const res = await request(app).post("/api/auth/signup/start").send({
+      name: "Not A Student",
+      email: `vitest-gmail-${runId}@gmail.com`,
+      password: "testpass123",
+      defaultRole: "passenger",
+    });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/university email/i);
+  });
+
+  it("resolves a curated domain to its full display name", async () => {
+    const email = `vitest-nsu-${runId}@northsouth.edu`;
+    const res = await request(app).post("/api/auth/signup/start").send({
+      name: "Curated Domain Student",
+      email,
+      password: "testpass123",
+      defaultRole: "passenger",
+    });
+    expect(res.status).toBe(200);
+
+    const code = capturedOtps.get(email);
+    const verify = await request(app).post("/api/auth/signup/verify").send({ email, code });
+    expect(verify.status).toBe(201);
+    expect(verify.body.user.university).toBe("North South University");
+  });
+
+  it("accepts an uncurated but plausible academic domain via the broad fallback", async () => {
+    const email = `vitest-other-uni-${runId}@somecollege.edu.bd`;
+    const res = await request(app).post("/api/auth/signup/start").send({
+      name: "Fallback Domain Student",
+      email,
+      password: "testpass123",
+      defaultRole: "passenger",
+    });
+    expect(res.status).toBe(200);
+
+    const code = capturedOtps.get(email);
+    const verify = await request(app).post("/api/auth/signup/verify").send({ email, code });
+    expect(verify.status).toBe(201);
+    expect(verify.body.user.university).toBe("Somecollege");
   });
 });
 
