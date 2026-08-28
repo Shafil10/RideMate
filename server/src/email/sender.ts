@@ -1,40 +1,41 @@
-import nodemailer from "nodemailer";
-
-// Gmail SMTP, not a transactional email API: no free provider we tried survived
-// contact with reality without a domain we don't own — Resend restricts free
-// delivery to the account owner's own email, SendGrid's free tier is now a
-// 60-day trial, and Brevo's signup requires phone verification that wouldn't
-// go through for this number. Gmail SMTP + an App Password needs none of that.
-let transporter: ReturnType<typeof nodemailer.createTransport> | null = null;
-
-function getTransporter() {
-  if (transporter) return transporter;
-  const user = process.env.GMAIL_USER;
-  const pass = process.env.GMAIL_APP_PASSWORD;
-  if (!user || !pass) return null;
-  transporter = nodemailer.createTransport({
-    service: "gmail",
-    auth: { user, pass },
-  });
-  return transporter;
-}
+// Brevo's transactional HTTP API, not SMTP: Render's free tier blocks all
+// outbound SMTP traffic (ports 25/465/587) to stop spam abuse, which silently
+// hung every send attempt from the live deployment even though it worked fine
+// from a dev machine. An HTTPS API call isn't SMTP, so it isn't blocked.
+// Sender is a single verified email (app.brevo.com/senders), not a domain —
+// no domain ownership required, unlike Resend's non-sandbox mode.
+const BREVO_API_URL = "https://api.brevo.com/v3/smtp/email";
 
 export function isEmailConfigured(): boolean {
-  return Boolean(process.env.GMAIL_USER && process.env.GMAIL_APP_PASSWORD);
+  return Boolean(process.env.BREVO_API_KEY && process.env.EMAIL_FROM);
 }
 
 async function sendEmail(to: string, subject: string, html: string): Promise<void> {
-  const t = getTransporter();
-  if (!t) {
-    throw new Error("GMAIL_USER / GMAIL_APP_PASSWORD is not configured");
+  const apiKey = process.env.BREVO_API_KEY;
+  const fromEmail = process.env.EMAIL_FROM;
+  if (!apiKey || !fromEmail) {
+    throw new Error("BREVO_API_KEY / EMAIL_FROM is not configured");
   }
 
-  await t.sendMail({
-    from: `"RideMate" <${process.env.GMAIL_USER}>`,
-    to,
-    subject,
-    html,
+  const res = await fetch(BREVO_API_URL, {
+    method: "POST",
+    headers: {
+      accept: "application/json",
+      "content-type": "application/json",
+      "api-key": apiKey,
+    },
+    body: JSON.stringify({
+      sender: { name: "RideMate", email: fromEmail },
+      to: [{ email: to }],
+      subject,
+      htmlContent: html,
+    }),
   });
+
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`Brevo API error ${res.status}: ${body}`);
+  }
 }
 
 export function sendOtpEmail(to: string, name: string, code: string): Promise<void> {
