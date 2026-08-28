@@ -28,6 +28,12 @@ export default function RideCard({ ride, onJoin, onCancel, onToggleFavorite, bus
             ) : (
               <span className="text-xs text-text-muted">New driver</span>
             )}
+            {ride.driverVehicle && (
+              <div className="text-[11px] text-text-muted mt-0.5">
+                {[ride.driverVehicle.color, ride.driverVehicle.make, ride.driverVehicle.model].filter(Boolean).join(" ")}
+                {ride.driverVehicle.plate && <> · {ride.driverVehicle.plate}</>}
+              </div>
+            )}
           </div>
         </div>
         {onToggleFavorite && (

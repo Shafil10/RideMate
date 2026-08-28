@@ -22,7 +22,17 @@ router.get("/search", async (req, res) => {
     url.searchParams.set("limit", "5");
     url.searchParams.set("accept-language", "en");
 
-    const r = await fetch(url, { headers: { "User-Agent": USER_AGENT } });
+    // A hung/slow upstream call used to leave the frontend "searching…"
+    // indefinitely and then look identical to a real zero-result search —
+    // failing fast (and loudly, below) makes the two distinguishable.
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 6000);
+    let r: Response;
+    try {
+      r = await fetch(url, { headers: { "User-Agent": USER_AGENT }, signal: controller.signal });
+    } finally {
+      clearTimeout(timeoutId);
+    }
     if (!r.ok) throw new Error(`Nominatim search failed: ${r.status}`);
     const data = (await r.json()) as { display_name: string; lat: string; lon: string }[];
 
@@ -31,7 +41,9 @@ router.get("/search", async (req, res) => {
     });
   } catch (err) {
     console.error("Geocode search failed:", err);
-    res.json({ results: [] });
+    // A non-2xx status here (instead of silently returning results: []) lets the
+    // frontend tell "search is temporarily unavailable" apart from "no matches".
+    res.status(503).json({ error: "Address search is temporarily unavailable — try again in a moment." });
   }
 });
 
@@ -49,7 +61,14 @@ router.get("/reverse", async (req, res) => {
     url.searchParams.set("lon", String(lng));
     url.searchParams.set("accept-language", "en");
 
-    const r = await fetch(url, { headers: { "User-Agent": USER_AGENT } });
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 6000);
+    let r: Response;
+    try {
+      r = await fetch(url, { headers: { "User-Agent": USER_AGENT }, signal: controller.signal });
+    } finally {
+      clearTimeout(timeoutId);
+    }
     if (!r.ok) throw new Error(`Nominatim reverse failed: ${r.status}`);
     const data = (await r.json()) as { display_name?: string };
 

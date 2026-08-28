@@ -30,6 +30,7 @@ export interface Ride {
   driverId: string;
   driverName: string;
   driverRating: { average: number; count: number; ridesCompleted: number; label: string | null } | null;
+  driverVehicle: { make: string | null; model: string | null; color: string | null; plate: string | null; seats: number | null } | null;
   createdAt: string;
   myBooking: {
     id: string;
@@ -93,6 +94,21 @@ export function fetchRecommendedRides(token: string): Promise<{ rides: Ride[] }>
   return request("/rides/recommended", undefined, token);
 }
 
+export function fetchNearbyRides(
+  route: { originLat: number; originLng: number; destLat: number; destLng: number; university?: string; desiredTime?: string },
+  token: string,
+): Promise<{ rides: Ride[] }> {
+  const qs = new URLSearchParams({
+    originLat: String(route.originLat),
+    originLng: String(route.originLng),
+    destLat: String(route.destLat),
+    destLng: String(route.destLng),
+    ...(route.university ? { university: route.university } : {}),
+    ...(route.desiredTime ? { desiredTime: route.desiredTime } : {}),
+  });
+  return request(`/rides/nearby?${qs.toString()}`, undefined, token);
+}
+
 export interface RideBooking {
   id: string;
   riderId: string;
@@ -139,6 +155,17 @@ export interface RecurringPattern {
 
 export function fetchRecurringPatterns(token: string): Promise<{ patterns: RecurringPattern[] }> {
   return request("/rides/recurring", undefined, token);
+}
+
+export interface FrequentPlace {
+  label: string;
+  count: number;
+  lat: number | null;
+  lng: number | null;
+}
+
+export function fetchFrequentPlaces(token: string): Promise<{ places: FrequentPlace[] }> {
+  return request("/rides/frequent-places", undefined, token);
 }
 
 export interface GeocodeResult {
@@ -222,6 +249,7 @@ export interface RideRequest {
   initiatorName: string;
   fulfilledByRideId: string | null;
   seatsNeeded: number;
+  maxParticipants: number;
   participants: RideRequestParticipant[];
 }
 
@@ -267,6 +295,20 @@ export function fetchNearbyRideRequests(
     ...(route.university ? { university: route.university } : {}),
   });
   return request(`/ride-requests/nearby?${qs.toString()}`, undefined, token);
+}
+
+export function fetchJoinablePoolRequests(
+  route: { originLat: number; originLng: number; destLat: number; destLng: number; university?: string },
+  token: string,
+): Promise<{ requests: RideRequest[] }> {
+  const qs = new URLSearchParams({
+    originLat: String(route.originLat),
+    originLng: String(route.originLng),
+    destLat: String(route.destLat),
+    destLng: String(route.destLng),
+    ...(route.university ? { university: route.university } : {}),
+  });
+  return request(`/ride-requests/joinable?${qs.toString()}`, undefined, token);
 }
 
 export interface JoinRideRequestInput {
@@ -337,7 +379,6 @@ export function startSignup(input: {
   name: string;
   email: string;
   password: string;
-  university: string;
   defaultRole: UserRole;
   vehicle?: VehicleInput;
 }): Promise<{ message: string; email: string }> {

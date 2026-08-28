@@ -12,7 +12,7 @@ async function loginAsDemo(page: import("@playwright/test").Page) {
 
 test("passenger home shows the bottom tab bar and no serious accessibility violations", async ({ page }) => {
   await loginAsDemo(page);
-  await expect(page.getByRole("heading", { name: "Available rides" })).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByRole("heading", { name: /Where to/i })).toBeVisible({ timeout: 10_000 });
 
   await expect(page.getByRole("link", { name: /Home/i })).toBeVisible();
   await expect(page.getByRole("link", { name: /Activity/i })).toBeVisible();

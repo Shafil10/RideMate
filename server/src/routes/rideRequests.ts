@@ -6,6 +6,9 @@ import { computeSegmentFare } from "./rides.js";
 
 const router = Router();
 
+// Initiator + up to this many more — matches a typical car's spare seats.
+const MAX_POOL_PARTICIPANTS = 4;
+
 function serializeRequest(request: {
   id: string;
   origin: string;
@@ -47,6 +50,7 @@ function serializeRequest(request: {
     initiatorName: request.initiator.name,
     fulfilledByRideId: request.fulfilledByRideId,
     seatsNeeded: request.participants.length,
+    maxParticipants: MAX_POOL_PARTICIPANTS,
     participants: request.participants.map((p) => ({
       id: p.id,
       riderId: p.rider.id,
@@ -161,6 +165,52 @@ router.get("/nearby", requireAuth, async (req, res) => {
   res.json({ requests: nearby.map(serializeRequest) });
 });
 
+// Passenger discovery: given the same route a passenger just searched (see
+// rides.ts's /nearby, which finds driver-offered rides on that route), this finds
+// other students' OPEN pool requests going the same way — matched against the
+// request's own origin->destination, the same geometry rides.ts uses — that
+// still have a free slot, aren't the searcher's own, and the searcher hasn't
+// already joined. Lets a passenger pool onto an existing request instead of
+// starting a duplicate one, even when the initiator doesn't own a car.
+router.get("/joinable", requireAuth, async (req, res) => {
+  const userId = req.user!.sub;
+  const originLat = Number(req.query.originLat);
+  const originLng = Number(req.query.originLng);
+  const destLat = Number(req.query.destLat);
+  const destLng = Number(req.query.destLng);
+  const university = typeof req.query.university === "string" ? req.query.university : undefined;
+
+  if (![originLat, originLng, destLat, destLng].every(Number.isFinite)) {
+    return res.status(400).json({ error: "originLat, originLng, destLat, destLng are required." });
+  }
+
+  const passengerOrigin = { lat: originLat, lng: originLng };
+  const passengerDest = { lat: destLat, lng: destLng };
+
+  const candidates = await prisma.rideRequest.findMany({
+    where: {
+      status: "open",
+      initiatorId: { not: userId },
+      ...(university ? { university } : {}),
+    },
+    include: requestInclude,
+  });
+
+  const joinable = candidates
+    .filter((r) => r.participants.length < MAX_POOL_PARTICIPANTS)
+    .filter((r) => !r.participants.some((p) => p.rider.id === userId))
+    .filter((r) => r.originLat !== null && r.originLng !== null && r.destLat !== null && r.destLng !== null)
+    .filter((r) => {
+      const routeStart = { lat: r.originLat!, lng: r.originLng! };
+      const routeEnd = { lat: r.destLat!, lng: r.destLng! };
+      const originMatch = matchToRoute(passengerOrigin, routeStart, routeEnd);
+      const destMatch = matchToRoute(passengerDest, routeStart, routeEnd);
+      return originMatch.withinRadius && destMatch.withinRadius && destMatch.t > originMatch.t;
+    });
+
+  res.json({ requests: joinable.map(serializeRequest) });
+});
+
 router.post("/:id/join", requireAuth, async (req, res) => {
   const { pickupPoint, pickupLat, pickupLng, dropoffPoint, dropoffLat, dropoffLng } = req.body ?? {};
 
@@ -168,12 +218,18 @@ router.post("/:id/join", requireAuth, async (req, res) => {
     return res.status(400).json({ error: "pickupPoint and dropoffPoint are required." });
   }
 
-  const request = await prisma.rideRequest.findUnique({ where: { id: req.params.id } });
+  const request = await prisma.rideRequest.findUnique({
+    where: { id: req.params.id },
+    include: { participants: { select: { id: true } } },
+  });
   if (!request) {
     return res.status(404).json({ error: "Request not found." });
   }
   if (request.status !== "open") {
     return res.status(409).json({ error: "This request is no longer open." });
+  }
+  if (request.participants.length >= MAX_POOL_PARTICIPANTS) {
+    return res.status(409).json({ error: "This pool request is full." });
   }
 
   const existing = await prisma.rideRequestParticipant.findUnique({

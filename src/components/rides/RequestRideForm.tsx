@@ -8,15 +8,19 @@ import { useAuth } from "../../context/AuthContext";
 interface Props {
   onCreated: (request: RideRequest) => void;
   onCancel: () => void;
+  initial?: { origin: PointValue; destination: PointValue; desiredTime: string };
 }
 
-export default function RequestRideForm({ onCreated, onCancel }: Props) {
+export default function RequestRideForm({ onCreated, onCancel, initial }: Props) {
   const { user, token } = useAuth();
-  const [origin, setOrigin] = useState<PointValue>(emptyPoint);
-  const [destination, setDestination] = useState<PointValue>(emptyPoint);
-  const [desiredTime, setDesiredTime] = useState("");
-  const [pickup, setPickup] = useState<PointValue>(emptyPoint);
-  const [dropoff, setDropoff] = useState<PointValue>(emptyPoint);
+  const [origin, setOrigin] = useState<PointValue>(initial?.origin ?? emptyPoint);
+  const [destination, setDestination] = useState<PointValue>(initial?.destination ?? emptyPoint);
+  const [desiredTime, setDesiredTime] = useState(initial?.desiredTime ?? "");
+  // Defaults to the route just searched — the common case is "pick me up where
+  // I said I'd start, drop me off where I said I'd end" — but stays editable for
+  // the initiator's own exact spot (e.g. a side street just off the main route).
+  const [pickup, setPickup] = useState<PointValue>(initial?.origin ?? emptyPoint);
+  const [dropoff, setDropoff] = useState<PointValue>(initial?.destination ?? emptyPoint);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -66,38 +70,58 @@ export default function RequestRideForm({ onCreated, onCancel }: Props) {
 
       {error && <div className="bg-danger-light text-danger rounded-2xl px-4 py-3 text-sm font-medium">{error}</div>}
 
-      <div className="flex flex-col gap-1.5">
-        <span className="text-sm font-semibold text-text">Origin</span>
-        <AddressAutocomplete
-          placeholder="Start typing an address"
-          value={origin.label}
-          onChange={(text) => setOrigin((o) => ({ ...o, label: text }))}
-          onSelectLocation={(loc) => setOrigin({ label: loc.label, location: { lat: loc.lat, lng: loc.lng } })}
-          style={inputStyle}
-          required
-        />
-      </div>
+      {initial ? (
+        <div className="bg-primary-light rounded-2xl px-4 py-3 text-sm text-primary-dark font-medium">
+          {origin.label} → {destination.label}
+          <div className="text-xs font-normal mt-0.5">
+            {desiredTime ? new Date(desiredTime).toLocaleString([], { dateStyle: "medium", timeStyle: "short" }) : ""}
+          </div>
+        </div>
+      ) : (
+        <>
+          <div className="flex flex-col gap-1.5">
+            <span className="text-sm font-semibold text-text">Origin</span>
+            <AddressAutocomplete
+              placeholder="Start typing an address"
+              value={origin.label}
+              onChange={(text) => setOrigin((o) => ({ ...o, label: text }))}
+              onSelectLocation={(loc) => setOrigin({ label: loc.label, location: { lat: loc.lat, lng: loc.lng } })}
+              style={inputStyle}
+              required
+            />
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <span className="text-sm font-semibold text-text">Destination</span>
+            <AddressAutocomplete
+              placeholder="Start typing an address"
+              value={destination.label}
+              onChange={(text) => setDestination((d) => ({ ...d, label: text }))}
+              onSelectLocation={(loc) => setDestination({ label: loc.label, location: { lat: loc.lat, lng: loc.lng } })}
+              style={inputStyle}
+              required
+            />
+          </div>
+
+          <Input
+            label="Your convenient time"
+            type="datetime-local"
+            value={desiredTime}
+            onChange={(e) => setDesiredTime(e.target.value)}
+            required
+          />
+        </>
+      )}
 
       <div className="flex flex-col gap-1.5">
-        <span className="text-sm font-semibold text-text">Destination</span>
-        <AddressAutocomplete
-          placeholder="Start typing an address"
-          value={destination.label}
-          onChange={(text) => setDestination((d) => ({ ...d, label: text }))}
-          onSelectLocation={(loc) => setDestination({ label: loc.label, location: { lat: loc.lat, lng: loc.lng } })}
-          style={inputStyle}
-          required
-        />
+        <span className="text-sm font-semibold text-text">Your pickup & drop-off</span>
+        <p className="text-xs text-text-muted -mt-1">
+          {initial
+            ? "Just for you — pre-filled from the route above, but edit it if your exact spot is different."
+            : "Just for you, along this route."}{" "}
+          Anyone who joins this pool afterwards will set their own pickup and drop-off separately.
+        </p>
       </div>
-
-      <Input
-        label="Your convenient time"
-        type="datetime-local"
-        value={desiredTime}
-        onChange={(e) => setDesiredTime(e.target.value)}
-        required
-      />
-
       <PickupDropoffPicker pickup={pickup} onPickupChange={setPickup} dropoff={dropoff} onDropoffChange={setDropoff} />
 
       <div className="flex gap-3 pt-1">

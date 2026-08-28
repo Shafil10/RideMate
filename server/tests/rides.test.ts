@@ -74,3 +74,73 @@ describe("POST /api/rides", () => {
     createdRideIds.push(res.body.ride.id);
   });
 });
+
+describe("GET /api/rides/nearby", () => {
+  // Straight line from Dhanmondi to Bashundhara — the ride's own stored route.
+  const routeStart = { lat: 23.7461, lng: 90.3742 };
+  const routeEnd = { lat: 23.8103, lng: 90.4215 };
+  let onRouteRideId: string;
+
+  beforeAll(async () => {
+    const user = await prisma.user.findUniqueOrThrow({ where: { email: TEST_EMAIL } });
+    const ride = await prisma.ride.create({
+      data: {
+        type: "student-driver",
+        origin: "Dhanmondi",
+        originLat: routeStart.lat,
+        originLng: routeStart.lng,
+        destination: "Bashundhara",
+        destLat: routeEnd.lat,
+        destLng: routeEnd.lng,
+        university: "North South University",
+        departureTime: new Date(Date.now() + 3600_000),
+        seatsTotal: 4,
+        farePerSeat: 100,
+        driverId: user.id,
+      },
+    });
+    onRouteRideId = ride.id;
+    createdRideIds.push(ride.id);
+  });
+
+  it("rejects an unauthenticated request", async () => {
+    const res = await request(app).get("/api/rides/nearby");
+    expect(res.status).toBe(401);
+  });
+
+  it("rejects a request missing coordinates", async () => {
+    const res = await request(app)
+      .get("/api/rides/nearby")
+      .set("Authorization", `Bearer ${token}`)
+      .query({ originLat: routeStart.lat });
+    expect(res.status).toBe(400);
+  });
+
+  it("finds a ride whose route passes within 200m of both points, in order", async () => {
+    const res = await request(app)
+      .get("/api/rides/nearby")
+      .set("Authorization", `Bearer ${token}`)
+      .query({
+        originLat: routeStart.lat,
+        originLng: routeStart.lng,
+        destLat: routeEnd.lat,
+        destLng: routeEnd.lng,
+      });
+    expect(res.status).toBe(200);
+    expect(res.body.rides.map((r: { id: string }) => r.id)).toContain(onRouteRideId);
+  });
+
+  it("excludes a ride when the searched points are far from its route", async () => {
+    const res = await request(app)
+      .get("/api/rides/nearby")
+      .set("Authorization", `Bearer ${token}`)
+      .query({
+        originLat: 24.5,
+        originLng: 91.5,
+        destLat: 24.6,
+        destLng: 91.6,
+      });
+    expect(res.status).toBe(200);
+    expect(res.body.rides.map((r: { id: string }) => r.id)).not.toContain(onRouteRideId);
+  });
+});

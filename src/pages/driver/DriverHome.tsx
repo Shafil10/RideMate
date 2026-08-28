@@ -156,6 +156,13 @@ export default function DriverHome() {
 
       <Card className="flex flex-col gap-4">
         <h2 className="font-display text-lg font-bold text-text">Offer a ride</h2>
+        {user?.vehicleMake && (
+          <div className="text-xs text-driver-dark bg-driver-light rounded-2xl px-4 py-2.5 -mt-1">
+            🚗 Registered vehicle: {[user.vehicleColor, user.vehicleMake, user.vehicleModel].filter(Boolean).join(" ")}
+            {user.vehiclePlate && <> · {user.vehiclePlate}</>}
+            {user.vehicleSeats && <> · {user.vehicleSeats} seats</>} — this is what passengers will see on your rides.
+          </div>
+        )}
         <form onSubmit={handleCreate} className="flex flex-col gap-4">
           <select
             value={form.type}

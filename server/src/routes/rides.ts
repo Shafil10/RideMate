@@ -71,7 +71,14 @@ function serializeRide(
     farePerSeat: number;
     createdAt: Date;
     driverId: string;
-    driver: { name: string };
+    driver: {
+      name: string;
+      vehicleMake: string | null;
+      vehicleModel: string | null;
+      vehicleColor: string | null;
+      vehiclePlate: string | null;
+      vehicleSeats: number | null;
+    };
   },
   myBooking?: {
     id: string;
@@ -103,6 +110,16 @@ function serializeRide(
     driverId: ride.driverId,
     driverName: ride.driver.name,
     driverRating: driverRating ?? null,
+    driverVehicle:
+      ride.driver.vehicleMake || ride.driver.vehicleModel || ride.driver.vehiclePlate
+        ? {
+            make: ride.driver.vehicleMake,
+            model: ride.driver.vehicleModel,
+            color: ride.driver.vehicleColor,
+            plate: ride.driver.vehiclePlate,
+            seats: ride.driver.vehicleSeats,
+          }
+        : null,
     createdAt: ride.createdAt.toISOString(),
     myBooking: myBooking ?? null,
     isFavorited,
@@ -112,7 +129,7 @@ function serializeRide(
 router.get("/", optionalAuth, async (req, res) => {
   const rides = await prisma.ride.findMany({
     include: {
-      driver: { select: { name: true } },
+      driver: { select: { name: true, vehicleMake: true, vehicleModel: true, vehicleColor: true, vehiclePlate: true, vehicleSeats: true } },
       bookings: {
         where: { status: "confirmed" },
         select: {
@@ -145,7 +162,7 @@ router.get("/mine", requireAuth, async (req, res) => {
   const rides = await prisma.ride.findMany({
     where: { driverId: userId },
     include: {
-      driver: { select: { name: true } },
+      driver: { select: { name: true, vehicleMake: true, vehicleModel: true, vehicleColor: true, vehiclePlate: true, vehicleSeats: true } },
       bookings: {
         where: { status: "confirmed" },
         select: {
@@ -214,7 +231,7 @@ router.get("/recommended", requireAuth, async (req, res) => {
   const candidates = await prisma.ride.findMany({
     where: { driverId: { not: userId }, departureTime: { gte: new Date() } },
     include: {
-      driver: { select: { name: true } },
+      driver: { select: { name: true, vehicleMake: true, vehicleModel: true, vehicleColor: true, vehiclePlate: true, vehicleSeats: true } },
       bookings: {
         where: { status: "confirmed" },
         select: {
@@ -252,6 +269,72 @@ router.get("/recommended", requireAuth, async (req, res) => {
   });
 });
 
+// Ad-hoc search: a passenger types an origin+destination they want *right now*
+// (not their booking history, unlike /recommended) and this finds already-offered
+// rides whose own route passes near both points, in the right order — the same
+// matchToRoute geometry /ride-requests/nearby uses for driver-side matching,
+// just inverted: here the *ride's* origin->destination is the route being tested,
+// and the passenger's typed points are the candidates.
+router.get("/nearby", requireAuth, async (req, res) => {
+  const userId = req.user!.sub;
+  const originLat = Number(req.query.originLat);
+  const originLng = Number(req.query.originLng);
+  const destLat = Number(req.query.destLat);
+  const destLng = Number(req.query.destLng);
+  const university = typeof req.query.university === "string" ? req.query.university : undefined;
+  const desiredTime = typeof req.query.desiredTime === "string" ? new Date(req.query.desiredTime) : null;
+
+  if (![originLat, originLng, destLat, destLng].every(Number.isFinite)) {
+    return res.status(400).json({ error: "originLat, originLng, destLat, destLng are required." });
+  }
+
+  const passengerOrigin = { lat: originLat, lng: originLng };
+  const passengerDest = { lat: destLat, lng: destLng };
+
+  const candidates = await prisma.ride.findMany({
+    where: {
+      departureTime: { gte: new Date() },
+      ...(university ? { university } : {}),
+    },
+    include: {
+      driver: { select: { name: true, vehicleMake: true, vehicleModel: true, vehicleColor: true, vehiclePlate: true, vehicleSeats: true } },
+      bookings: {
+        where: { status: "confirmed" },
+        select: {
+          id: true, riderId: true, pickupPoint: true, pickupLat: true, pickupLng: true,
+          dropoffPoint: true, dropoffLat: true, dropoffLng: true, fare: true,
+        },
+      },
+      favorites: { where: { userId }, select: { id: true } },
+    },
+  });
+
+  const matches = candidates
+    .filter((ride) => ride.seatsTaken < ride.seatsTotal)
+    .filter((ride) => ride.originLat !== null && ride.originLng !== null && ride.destLat !== null && ride.destLng !== null)
+    .filter((ride) => {
+      const routeStart = { lat: ride.originLat!, lng: ride.originLng! };
+      const routeEnd = { lat: ride.destLat!, lng: ride.destLng! };
+      const originMatch = matchToRoute(passengerOrigin, routeStart, routeEnd);
+      const destMatch = matchToRoute(passengerDest, routeStart, routeEnd);
+      return originMatch.withinRadius && destMatch.withinRadius && destMatch.t > originMatch.t;
+    })
+    .sort((a, b) =>
+      desiredTime
+        ? Math.abs(a.departureTime.getTime() - desiredTime.getTime()) - Math.abs(b.departureTime.getTime() - desiredTime.getTime())
+        : a.departureTime.getTime() - b.departureTime.getTime(),
+    );
+
+  const ratingMap = await getRatingSummaries(matches.map((ride) => ride.driverId));
+
+  res.json({
+    rides: matches.map((ride) => {
+      const myBooking = ride.bookings.find((b) => b.riderId === userId);
+      return serializeRide(ride, myBooking, ride.favorites.length > 0, ratingMap.get(ride.driverId) ?? null);
+    }),
+  });
+});
+
 router.post("/", requireAuth, async (req, res) => {
   const { type, origin, originLat, originLng, destination, destLat, destLng, university, departureTime, seatsTotal, farePerSeat } =
     req.body ?? {};
@@ -275,7 +358,7 @@ router.post("/", requireAuth, async (req, res) => {
       farePerSeat: Number(farePerSeat) || 0,
       driverId: req.user!.sub,
     },
-    include: { driver: { select: { name: true } } },
+    include: { driver: { select: { name: true, vehicleMake: true, vehicleModel: true, vehicleColor: true, vehiclePlate: true, vehicleSeats: true } } },
   });
 
   res.status(201).json({ ride: serializeRide(ride) });
@@ -318,7 +401,7 @@ router.post("/:id/join", requireAuth, async (req, res) => {
     return res.status(400).json({ error: "A pickup point on the ride's route is required." });
   }
 
-  const ride = await prisma.ride.findUnique({ where: { id: req.params.id }, include: { driver: { select: { name: true } } } });
+  const ride = await prisma.ride.findUnique({ where: { id: req.params.id }, include: { driver: { select: { name: true, vehicleMake: true, vehicleModel: true, vehicleColor: true, vehiclePlate: true, vehicleSeats: true } } } });
 
   if (!ride) {
     return res.status(404).json({ error: "Ride not found." });
@@ -365,7 +448,7 @@ router.post("/:id/join", requireAuth, async (req, res) => {
     prisma.ride.update({
       where: { id: ride.id },
       data: { seatsTaken: { increment: 1 } },
-      include: { driver: { select: { name: true } } },
+      include: { driver: { select: { name: true, vehicleMake: true, vehicleModel: true, vehicleColor: true, vehiclePlate: true, vehicleSeats: true } } },
     }),
   ]);
 
@@ -400,7 +483,7 @@ router.post("/:id/cancel", requireAuth, async (req, res) => {
     prisma.ride.update({
       where: { id: req.params.id },
       data: { seatsTaken: { decrement: 1 } },
-      include: { driver: { select: { name: true } } },
+      include: { driver: { select: { name: true, vehicleMake: true, vehicleModel: true, vehicleColor: true, vehiclePlate: true, vehicleSeats: true } } },
     }),
   ]);
 
@@ -506,6 +589,43 @@ router.get("/pickup-suggestions", requireAuth, async (req, res) => {
     .map(([pickupPoint, info]) => ({ pickupPoint, count: info.count, lat: info.lat, lng: info.lng }));
 
   res.json({ suggestions });
+});
+
+// Frequent places (pickup AND drop-off points from past confirmed bookings,
+// deduped and ranked by how often visited) — powers the "Where to?" quick-select
+// dropdown so passengers don't have to retype places they go often.
+router.get("/frequent-places", requireAuth, async (req, res) => {
+  const userId = req.user!.sub;
+
+  const bookings = await prisma.booking.findMany({
+    where: { riderId: userId, status: "confirmed" },
+    select: {
+      pickupPoint: true, pickupLat: true, pickupLng: true,
+      dropoffPoint: true, dropoffLat: true, dropoffLng: true,
+      createdAt: true,
+    },
+    orderBy: { createdAt: "desc" },
+    take: 50,
+  });
+
+  const counts = new Map<string, { count: number; lat: number | null; lng: number | null }>();
+  const tally = (label: string | null, lat: number | null, lng: number | null) => {
+    if (!label) return;
+    const existing = counts.get(label);
+    if (existing) existing.count += 1;
+    else counts.set(label, { count: 1, lat, lng });
+  };
+  for (const b of bookings) {
+    tally(b.pickupPoint, b.pickupLat, b.pickupLng);
+    tally(b.dropoffPoint, b.dropoffLat, b.dropoffLng);
+  }
+
+  const places = [...counts.entries()]
+    .sort((a, b) => b[1].count - a[1].count)
+    .slice(0, 6)
+    .map(([label, info]) => ({ label, count: info.count, lat: info.lat, lng: info.lng }));
+
+  res.json({ places });
 });
 
 router.get("/history", requireAuth, async (req, res) => {
