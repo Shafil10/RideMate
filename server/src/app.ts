@@ -6,6 +6,7 @@ import authRouter from "./routes/auth.js";
 import contentRouter from "./routes/content.js";
 import geocodeRouter from "./routes/geocode.js";
 import rideRequestsRouter from "./routes/rideRequests.js";
+import messagesRouter from "./routes/messages.js";
 
 const app = express();
 
@@ -22,5 +23,6 @@ app.use("/api/auth", authRouter);
 app.use("/api/content", contentRouter);
 app.use("/api/geocode", geocodeRouter);
 app.use("/api/ride-requests", rideRequestsRouter);
+app.use("/api/messages", messagesRouter);
 
 export default app;

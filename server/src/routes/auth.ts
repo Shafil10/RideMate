@@ -263,4 +263,71 @@ router.patch("/me", requireAuth, async (req, res) => {
   res.json({ user: publicUser(user) });
 });
 
+// Editable from the Profile screen: name, phone number, and (less commonly)
+// email. Email changes re-run the same domain resolution signup relies on —
+// a university email is a university email everywhere, not just at signup —
+// but skip OTP re-verification, unlike signup itself; see PR discussion for
+// why that trade-off was accepted for this pass.
+router.patch("/profile", requireAuth, async (req, res) => {
+  const { name, phoneNumber, email } = req.body ?? {};
+  const data: { name?: string; phoneNumber?: string; email?: string; university?: string } = {};
+
+  if (name !== undefined) {
+    const trimmed = String(name).trim();
+    if (!trimmed) return res.status(400).json({ error: "Name can't be empty." });
+    data.name = trimmed;
+  }
+
+  if (phoneNumber !== undefined) {
+    const trimmed = String(phoneNumber).trim();
+    if (!trimmed) return res.status(400).json({ error: "Phone number can't be empty." });
+    data.phoneNumber = trimmed;
+  }
+
+  if (email !== undefined) {
+    const normalizedEmail = String(email).toLowerCase().trim();
+    const university = resolveUniversityFromEmail(normalizedEmail);
+    if (!university) {
+      return res.status(400).json({ error: "Please use a valid university email address (e.g. you@northsouth.edu)." });
+    }
+    const existing = await prisma.user.findUnique({ where: { email: normalizedEmail } });
+    if (existing && existing.id !== req.user!.sub) {
+      return res.status(409).json({ error: "That email is already in use by another account." });
+    }
+    data.email = normalizedEmail;
+    data.university = university;
+  }
+
+  if (Object.keys(data).length === 0) {
+    return res.status(400).json({ error: "Nothing to update." });
+  }
+
+  const user = await prisma.user.update({ where: { id: req.user!.sub }, data });
+
+  // A changed email invalidates the token's embedded email/university, so
+  // issue a fresh one rather than leaving the client to keep using stale claims.
+  const token = signToken({ sub: user.id, name: user.name, email: user.email, university: user.university });
+  res.json({ token, user: publicUser(user) });
+});
+
+// Permanent deletion — requires re-entering the current password as
+// confirmation, same bar as changing it. Cascades (see schema.prisma) remove
+// everything this account owns: rides they drove, bookings they made,
+// ratings, favorites, pool requests, and messages. A driver's past
+// passengers keep no orphaned booking rows referencing a vanished user.
+router.delete("/me", requireAuth, async (req, res) => {
+  const { password } = req.body ?? {};
+  if (!password) {
+    return res.status(400).json({ error: "Enter your password to confirm account deletion." });
+  }
+
+  const user = await prisma.user.findUnique({ where: { id: req.user!.sub } });
+  if (!user || !(await bcrypt.compare(String(password), user.passwordHash))) {
+    return res.status(401).json({ error: "Incorrect password." });
+  }
+
+  await prisma.user.delete({ where: { id: user.id } });
+  res.json({ message: "Account deleted." });
+});
+
 export default router;

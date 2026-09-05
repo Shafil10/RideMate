@@ -7,6 +7,8 @@ import {
   startPasswordReset as startPasswordResetRequest,
   verifyPasswordReset as verifyPasswordResetRequest,
   updateDefaultRole,
+  updateProfile as updateProfileRequest,
+  deleteAccount as deleteAccountRequest,
   type AuthUser,
   type UserRole,
   type VehicleInput,
@@ -34,6 +36,8 @@ interface AuthContextValue {
   verifyPasswordReset: (email: string, code: string, newPassword: string) => Promise<void>;
   logout: () => void;
   setDefaultRole: (role: UserRole) => Promise<void>;
+  updateProfile: (input: { name?: string; phoneNumber?: string; email?: string }) => Promise<void>;
+  deleteAccount: (password: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -138,6 +142,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  async function updateProfile(input: { name?: string; phoneNumber?: string; email?: string }) {
+    if (!token) return;
+    setLoading(true);
+    try {
+      const { token: newToken, user: updated } = await updateProfileRequest(input, token);
+      setUser(updated);
+      setToken(newToken);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ token: newToken, user: updated }));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function deleteAccount(password: string) {
+    if (!token) return;
+    setLoading(true);
+    try {
+      await deleteAccountRequest(password, token);
+      logout();
+    } finally {
+      setLoading(false);
+    }
+  }
+
   return (
     <AuthContext.Provider
       value={{
@@ -152,6 +180,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         verifyPasswordReset,
         logout,
         setDefaultRole,
+        updateProfile,
+        deleteAccount,
       }}
     >
       {children}

@@ -1,11 +1,13 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, Users } from "lucide-react";
 import { fetchRideHistory, fetchRides, fetchMyOfferedRides, type RideHistoryEntry, type Ride, type DriverRide } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
 import { Card, CardSkeleton, Chip, EmptyState } from "../components/ui";
 import RatingPrompt from "../components/rides/RatingPrompt";
 import RideCard from "../components/rides/RideCard";
 import FareBreakdown from "../components/rides/FareBreakdown";
+import PassengersSheet from "../components/rides/PassengersSheet";
+import ChatSheet from "../components/rides/ChatSheet";
 import EmptyActivityIllustration from "../components/illustrations/EmptyActivityIllustration";
 
 export default function ActivityPage() {
@@ -16,6 +18,8 @@ export default function ActivityPage() {
   const [passengerRides, setPassengerRides] = useState<Ride[]>([]);
   const [driverRides, setDriverRides] = useState<DriverRide[]>([]);
   const [loading, setLoading] = useState(true);
+  const [passengersRide, setPassengersRide] = useState<DriverRide | null>(null);
+  const [chatWith, setChatWith] = useState<{ rideId: string; otherUserId: string; otherUserName: string } | null>(null);
 
   function load() {
     if (!token) return;
@@ -83,12 +87,12 @@ export default function ActivityPage() {
         <>
           <ActivitySection title="Upcoming rides" emptyText="No upcoming rides.">
             {upcomingDriverRides.map((ride) => (
-              <DriverActivityCard key={ride.id} ride={ride} />
+              <DriverActivityCard key={ride.id} ride={ride} onOpenPassengers={() => setPassengersRide(ride)} />
             ))}
           </ActivitySection>
           <ActivitySection title="Completed rides" emptyText="No completed rides yet.">
             {completedDriverRides.map((ride) => (
-              <DriverActivityCard key={ride.id} ride={ride} />
+              <DriverActivityCard key={ride.id} ride={ride} onOpenPassengers={() => setPassengersRide(ride)} />
             ))}
           </ActivitySection>
         </>
@@ -96,15 +100,44 @@ export default function ActivityPage() {
         <>
           <ActivitySection title="Upcoming rides" emptyText="No upcoming rides.">
             {upcomingPassengerRides.map((ride) => (
-              <RideCard key={ride.id} ride={ride} />
+              <RideCard
+                key={ride.id}
+                ride={ride}
+                onMessage={() => setChatWith({ rideId: ride.id, otherUserId: ride.driverId, otherUserName: ride.driverName })}
+              />
             ))}
           </ActivitySection>
           <ActivitySection title="Completed rides" emptyText="No completed rides yet.">
             {completedPassengerRides.map((ride) => (
-              <RideCard key={ride.id} ride={ride} />
+              <RideCard
+                key={ride.id}
+                ride={ride}
+                onMessage={() => setChatWith({ rideId: ride.id, otherUserId: ride.driverId, otherUserName: ride.driverName })}
+              />
             ))}
           </ActivitySection>
         </>
+      )}
+
+      <PassengersSheet
+        open={!!passengersRide}
+        onClose={() => setPassengersRide(null)}
+        bookings={passengersRide?.bookings ?? []}
+        onMessage={(booking) => {
+          if (!passengersRide) return;
+          setChatWith({ rideId: passengersRide.id, otherUserId: booking.riderId, otherUserName: booking.riderName });
+          setPassengersRide(null);
+        }}
+      />
+
+      {chatWith && (
+        <ChatSheet
+          open={!!chatWith}
+          onClose={() => setChatWith(null)}
+          rideId={chatWith.rideId}
+          otherUserId={chatWith.otherUserId}
+          otherUserName={chatWith.otherUserName}
+        />
       )}
     </div>
   );
@@ -123,7 +156,7 @@ function ActivitySection({ title, emptyText, children }: { title: string; emptyT
   );
 }
 
-function DriverActivityCard({ ride }: { ride: DriverRide }) {
+function DriverActivityCard({ ride, onOpenPassengers }: { ride: DriverRide; onOpenPassengers: () => void }) {
   const isPast = new Date(ride.departureTime).getTime() <= Date.now();
   return (
     <Card className="flex flex-col gap-3">
@@ -140,9 +173,15 @@ function DriverActivityCard({ ride }: { ride: DriverRide }) {
         <span className="truncate">{ride.destination}</span>
       </div>
 
-      <div className="text-xs text-text-muted">
-        {new Date(ride.departureTime).toLocaleString(undefined, { weekday: "short", hour: "numeric", minute: "2-digit" })} ·{" "}
-        {ride.seatsTaken}/{ride.seatsTotal} seats
+      <div className="flex items-center gap-1.5">
+        <Chip tone="neutral">
+          {new Date(ride.departureTime).toLocaleString(undefined, { weekday: "short", hour: "numeric", minute: "2-digit" })}
+        </Chip>
+        <button type="button" onClick={onOpenPassengers} disabled={ride.bookings.length === 0} className="disabled:cursor-default">
+          <Chip tone={ride.bookings.length > 0 ? "primary" : "neutral"} icon={<Users size={11} />}>
+            {ride.seatsTaken}/{ride.seatsTotal} seats{ride.bookings.length > 0 ? " · view" : ""}
+          </Chip>
+        </button>
       </div>
 
       {ride.bookings.length > 0 ? (

@@ -1,9 +1,11 @@
 import { useEffect, useState } from "react";
 import { ArrowRight, Clock3, Users } from "lucide-react";
-import { fetchMyOfferedRides, type DriverRide } from "../../lib/api";
+import { fetchMyOfferedRides, type DriverRide, type RideBooking } from "../../lib/api";
 import { useAuth } from "../../context/AuthContext";
 import { Card, CardSkeleton, Chip, EmptyState, useToast } from "../../components/ui";
 import FareBreakdown from "../../components/rides/FareBreakdown";
+import PassengersSheet from "../../components/rides/PassengersSheet";
+import ChatSheet from "../../components/rides/ChatSheet";
 import NoRidesIllustration from "../../components/illustrations/NoRidesIllustration";
 
 export default function MyOfferedRides() {
@@ -11,6 +13,8 @@ export default function MyOfferedRides() {
   const { showToast } = useToast();
   const [rides, setRides] = useState<DriverRide[]>([]);
   const [loading, setLoading] = useState(true);
+  const [passengersRide, setPassengersRide] = useState<DriverRide | null>(null);
+  const [chatWith, setChatWith] = useState<{ rideId: string; booking: RideBooking } | null>(null);
 
   useEffect(() => {
     if (!token) return;
@@ -66,9 +70,16 @@ export default function MyOfferedRides() {
                       minute: "2-digit",
                     })}
                   </Chip>
-                  <Chip tone="neutral" icon={<Users size={11} />}>
-                    {ride.seatsTaken}/{ride.seatsTotal} seats
-                  </Chip>
+                  <button
+                    type="button"
+                    onClick={() => ride.bookings.length > 0 && setPassengersRide(ride)}
+                    disabled={ride.bookings.length === 0}
+                    className="disabled:cursor-default"
+                  >
+                    <Chip tone={ride.bookings.length > 0 ? "primary" : "neutral"} icon={<Users size={11} />}>
+                      {ride.seatsTaken}/{ride.seatsTotal} seats{ride.bookings.length > 0 ? " · view" : ""}
+                    </Chip>
+                  </button>
                 </div>
 
                 {ride.bookings.length > 0 ? (
@@ -80,6 +91,27 @@ export default function MyOfferedRides() {
             );
           })}
         </div>
+      )}
+
+      <PassengersSheet
+        open={!!passengersRide}
+        onClose={() => setPassengersRide(null)}
+        bookings={passengersRide?.bookings ?? []}
+        onMessage={(booking) => {
+          if (!passengersRide) return;
+          setChatWith({ rideId: passengersRide.id, booking });
+          setPassengersRide(null);
+        }}
+      />
+
+      {chatWith && (
+        <ChatSheet
+          open={!!chatWith}
+          onClose={() => setChatWith(null)}
+          rideId={chatWith.rideId}
+          otherUserId={chatWith.booking.riderId}
+          otherUserName={chatWith.booking.riderName}
+        />
       )}
     </div>
   );

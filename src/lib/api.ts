@@ -120,6 +120,8 @@ export interface RideBooking {
   id: string;
   riderId: string;
   riderName: string;
+  riderEmail: string;
+  riderUniversity: string;
   riderPhone: string | null;
   pickupPoint: string;
   pickupLat: number | null;
@@ -416,6 +418,38 @@ export function verifyPasswordReset(
 
 export function updateDefaultRole(defaultRole: UserRole, token: string): Promise<{ user: AuthUser }> {
   return request("/auth/me", { method: "PATCH", body: JSON.stringify({ defaultRole }) }, token);
+}
+
+export function updateProfile(
+  input: { name?: string; phoneNumber?: string; email?: string },
+  token: string,
+): Promise<{ token: string; user: AuthUser }> {
+  return request("/auth/profile", { method: "PATCH", body: JSON.stringify(input) }, token);
+}
+
+export function deleteAccount(password: string, token: string): Promise<{ message: string }> {
+  return request("/auth/me", { method: "DELETE", body: JSON.stringify({ password }) }, token);
+}
+
+export interface ChatMessage {
+  id: string;
+  body: string;
+  senderId: string;
+  isMine: boolean;
+  createdAt: string;
+}
+
+export function fetchMessages(rideId: string, otherUserId: string, token: string): Promise<{ messages: ChatMessage[] }> {
+  return request(`/messages/${rideId}/${otherUserId}`, undefined, token);
+}
+
+export function sendMessage(
+  rideId: string,
+  otherUserId: string,
+  body: string,
+  token: string,
+): Promise<{ message: ChatMessage }> {
+  return request(`/messages/${rideId}/${otherUserId}`, { method: "POST", body: JSON.stringify({ body }) }, token);
 }
 
 export interface Stat {

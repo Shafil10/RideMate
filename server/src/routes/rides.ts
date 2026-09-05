@@ -173,7 +173,7 @@ router.get("/mine", requireAuth, async (req, res) => {
         select: {
           id: true, riderId: true, pickupPoint: true, pickupLat: true, pickupLng: true,
           dropoffPoint: true, dropoffLat: true, dropoffLng: true, fare: true,
-          rider: { select: { name: true, phoneNumber: true } },
+          rider: { select: { name: true, email: true, university: true, phoneNumber: true } },
         },
       },
     },
@@ -187,6 +187,8 @@ router.get("/mine", requireAuth, async (req, res) => {
         id: b.id,
         riderId: b.riderId,
         riderName: b.rider.name,
+        riderEmail: b.rider.email,
+        riderUniversity: b.rider.university,
         riderPhone: b.rider.phoneNumber,
         pickupPoint: b.pickupPoint,
         pickupLat: b.pickupLat,
@@ -300,6 +302,7 @@ router.get("/nearby", requireAuth, async (req, res) => {
   const candidates = await prisma.ride.findMany({
     where: {
       departureTime: { gte: new Date() },
+      driverId: { not: userId },
       ...(university ? { university } : {}),
     },
     include: {
@@ -411,6 +414,10 @@ router.post("/:id/join", requireAuth, async (req, res) => {
 
   if (!ride) {
     return res.status(404).json({ error: "Ride not found." });
+  }
+
+  if (ride.driverId === req.user!.sub) {
+    return res.status(400).json({ error: "You can't join a ride you're driving." });
   }
 
   if (ride.seatsTaken >= ride.seatsTotal) {

@@ -1,4 +1,4 @@
-import { Heart, ArrowRight, Users, Clock3, Phone } from "lucide-react";
+import { Heart, ArrowRight, Users, Clock3, Phone, MessageCircle } from "lucide-react";
 import { Avatar, Button, Card, Chip, StarRating } from "../ui";
 import type { Ride } from "../../lib/api";
 
@@ -7,12 +7,13 @@ interface RideCardProps {
   onJoin?: () => void;
   onCancel?: () => void;
   onToggleFavorite?: () => void;
+  onMessage?: () => void;
   busy?: boolean;
   favBusy?: boolean;
   requireLogin?: boolean;
 }
 
-export default function RideCard({ ride, onJoin, onCancel, onToggleFavorite, busy, favBusy, requireLogin }: RideCardProps) {
+export default function RideCard({ ride, onJoin, onCancel, onToggleFavorite, onMessage, busy, favBusy, requireLogin }: RideCardProps) {
   const full = ride.seatsTaken >= ride.seatsTotal;
   const seatsLeft = ride.seatsTotal - ride.seatsTaken;
 
@@ -74,11 +75,18 @@ export default function RideCard({ ride, onJoin, onCancel, onToggleFavorite, bus
             {ride.myBooking.dropoffPoint && <> → {ride.myBooking.dropoffPoint}</>}
             {typeof ride.myBooking.fare === "number" && <> · ৳{ride.myBooking.fare}</>}
           </div>
-          {ride.driverPhone && (
-            <a href={`tel:${ride.driverPhone}`} className="flex items-center gap-1.5 underline underline-offset-2">
-              <Phone size={12} /> Call {ride.driverName.split(" ")[0]}: {ride.driverPhone}
-            </a>
-          )}
+          <div className="flex items-center gap-3 flex-wrap">
+            {ride.driverPhone && (
+              <a href={`tel:${ride.driverPhone}`} className="flex items-center gap-1.5 underline underline-offset-2">
+                <Phone size={12} /> Call {ride.driverName.split(" ")[0]}
+              </a>
+            )}
+            {onMessage && (
+              <button type="button" onClick={onMessage} className="flex items-center gap-1.5 underline underline-offset-2">
+                <MessageCircle size={12} /> Message
+              </button>
+            )}
+          </div>
         </div>
       )}
 

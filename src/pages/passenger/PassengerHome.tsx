@@ -28,6 +28,7 @@ import RequestCard from "../../components/rides/RequestCard";
 import RequestRideForm from "../../components/rides/RequestRideForm";
 import AddressAutocomplete from "../../components/rides/AddressAutocomplete";
 import RouteMapPreview from "../../components/rides/RouteMapPreview";
+import ChatSheet from "../../components/rides/ChatSheet";
 import PickupDropoffPicker, { emptyPoint, type PointValue } from "../../components/rides/PickupDropoffPicker";
 import NoRidesIllustration from "../../components/illustrations/NoRidesIllustration";
 
@@ -74,6 +75,7 @@ export default function PassengerHome() {
   const [dropoff, setDropoff] = useState<PointValue>(emptyPoint);
   const [busyRideId, setBusyRideId] = useState<string | null>(null);
   const [favBusyId, setFavBusyId] = useState<string | null>(null);
+  const [chatWith, setChatWith] = useState<{ rideId: string; driverId: string; driverName: string } | null>(null);
 
   const [joiningPool, setJoiningPool] = useState<RideRequest | null>(null);
   const [poolPickup, setPoolPickup] = useState<PointValue>(emptyPoint);
@@ -361,6 +363,7 @@ export default function PassengerHome() {
                   key={ride.id}
                   ride={ride}
                   onCancel={() => handleCancelBooking(ride.id)}
+                  onMessage={() => setChatWith({ rideId: ride.id, driverId: ride.driverId, driverName: ride.driverName })}
                   busy={busyRideId === ride.id}
                 />
               ))}
@@ -455,7 +458,13 @@ export default function PassengerHome() {
               <div className="flex gap-3 overflow-x-auto pb-1 -mx-5 px-5">
                 {recommendedRides.map((ride) => (
                   <div key={ride.id} className="min-w-[260px] shrink-0">
-                    <RideCard ride={ride} onJoin={() => openJoin(ride)} busy={busyRideId === ride.id} requireLogin={!user} />
+                    <RideCard
+                      ride={ride}
+                      onJoin={() => openJoin(ride)}
+                      onMessage={ride.myBooking ? () => setChatWith({ rideId: ride.id, driverId: ride.driverId, driverName: ride.driverName }) : undefined}
+                      busy={busyRideId === ride.id}
+                      requireLogin={!user}
+                    />
                   </div>
                 ))}
               </div>
@@ -494,6 +503,7 @@ export default function PassengerHome() {
                       onJoin={() => openJoin(ride)}
                       onCancel={() => handleCancelBooking(ride.id)}
                       onToggleFavorite={() => handleToggleFavorite(ride.id)}
+                      onMessage={ride.myBooking ? () => setChatWith({ rideId: ride.id, driverId: ride.driverId, driverName: ride.driverName }) : undefined}
                       busy={busyRideId === ride.id}
                       favBusy={favBusyId === ride.id}
                       requireLogin={!user}
@@ -595,6 +605,16 @@ export default function PassengerHome() {
           </div>
         )}
       </BottomSheet>
+
+      {chatWith && (
+        <ChatSheet
+          open={!!chatWith}
+          onClose={() => setChatWith(null)}
+          rideId={chatWith.rideId}
+          otherUserId={chatWith.driverId}
+          otherUserName={chatWith.driverName}
+        />
+      )}
     </div>
   );
 }

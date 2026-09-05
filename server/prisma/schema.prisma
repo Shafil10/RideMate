@@ -37,6 +37,8 @@ model User {
   ratingsReceived  Rating[]                 @relation("RatingsReceived")
   rideRequests     RideRequest[]            @relation("RideRequestInitiator")
   requestBookings  RideRequestParticipant[]
+  messagesSent     Message[]                @relation("MessagesSent")
+  messagesReceived Message[]                @relation("MessagesReceived")
 }
 
 // Holds a signup until its OTP is verified — kept separate from User so an
@@ -94,12 +96,13 @@ model Ride {
   farePerSeat   Int
   createdAt     DateTime @default(now())
 
-  driver   User   @relation(fields: [driverId], references: [id])
+  driver   User   @relation(fields: [driverId], references: [id], onDelete: Cascade)
   driverId String
 
   bookings         Booking[]
   favorites        Favorite[]
   ratings          Rating[]
+  messages         Message[]
   fulfilledRequest RideRequest?
 }
 
@@ -119,10 +122,10 @@ model Booking {
   createdAt       DateTime  @default(now())
   cancelledAt     DateTime?
 
-  ride   Ride   @relation(fields: [rideId], references: [id])
+  ride   Ride   @relation(fields: [rideId], references: [id], onDelete: Cascade)
   rideId String
 
-  rider   User   @relation(fields: [riderId], references: [id])
+  rider   User   @relation(fields: [riderId], references: [id], onDelete: Cascade)
   riderId String
 }
 
@@ -130,10 +133,10 @@ model Favorite {
   id        String   @id @default(cuid())
   createdAt DateTime @default(now())
 
-  ride   Ride   @relation(fields: [rideId], references: [id])
+  ride   Ride   @relation(fields: [rideId], references: [id], onDelete: Cascade)
   rideId String
 
-  user   User   @relation(fields: [userId], references: [id])
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId String
 
   @@unique([userId, rideId])
@@ -157,7 +160,7 @@ model RideRequest {
   status      String   @default("open") // "open" | "fulfilled" | "cancelled"
   createdAt   DateTime @default(now())
 
-  initiator   User   @relation("RideRequestInitiator", fields: [initiatorId], references: [id])
+  initiator   User   @relation("RideRequestInitiator", fields: [initiatorId], references: [id], onDelete: Cascade)
   initiatorId String
 
   fulfilledByRide   Ride?   @relation(fields: [fulfilledByRideId], references: [id])
@@ -176,10 +179,10 @@ model RideRequestParticipant {
   dropoffLng   Float?
   createdAt    DateTime @default(now())
 
-  request   RideRequest @relation(fields: [requestId], references: [id])
+  request   RideRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
   requestId String
 
-  rider   User   @relation(fields: [riderId], references: [id])
+  rider   User   @relation(fields: [riderId], references: [id], onDelete: Cascade)
   riderId String
 
   @@unique([requestId, riderId])
@@ -191,16 +194,37 @@ model Rating {
   comment   String?
   createdAt DateTime @default(now())
 
-  ride   Ride   @relation(fields: [rideId], references: [id])
+  ride   Ride   @relation(fields: [rideId], references: [id], onDelete: Cascade)
   rideId String
 
-  rater   User   @relation("RatingsGiven", fields: [raterId], references: [id])
+  rater   User   @relation("RatingsGiven", fields: [raterId], references: [id], onDelete: Cascade)
   raterId String
 
-  rated   User   @relation("RatingsReceived", fields: [ratedId], references: [id])
+  rated   User   @relation("RatingsReceived", fields: [ratedId], references: [id], onDelete: Cascade)
   ratedId String
 
   @@unique([rideId, raterId, ratedId])
+}
+
+// A simple per-ride, per-counterpart thread — not a group chat. senderId and
+// recipientId are always {driver, one specific rider} for the ride in
+// question; a ride with three passengers has three separate threads, one per
+// rider, each only visible to that rider and the driver.
+model Message {
+  id          String   @id @default(cuid())
+  body        String
+  createdAt   DateTime @default(now())
+
+  ride   Ride   @relation(fields: [rideId], references: [id], onDelete: Cascade)
+  rideId String
+
+  sender   User   @relation("MessagesSent", fields: [senderId], references: [id], onDelete: Cascade)
+  senderId String
+
+  recipient   User   @relation("MessagesReceived", fields: [recipientId], references: [id], onDelete: Cascade)
+  recipientId String
+
+  @@index([rideId, senderId, recipientId])
 }
 
 model ChatMessage {
