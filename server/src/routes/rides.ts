@@ -73,6 +73,7 @@ function serializeRide(
     driverId: string;
     driver: {
       name: string;
+      phoneNumber: string | null;
       vehicleMake: string | null;
       vehicleModel: string | null;
       vehicleColor: string | null;
@@ -109,6 +110,10 @@ function serializeRide(
     farePerSeat: ride.farePerSeat,
     driverId: ride.driverId,
     driverName: ride.driver.name,
+    // Only revealed to someone who has actually booked this ride — not to a
+    // passenger just browsing/searching, matching the same privacy boundary
+    // as the rider phone numbers exposed to the driver in GET /mine below.
+    driverPhone: myBooking ? ride.driver.phoneNumber : null,
     driverRating: driverRating ?? null,
     driverVehicle:
       ride.driver.vehicleMake || ride.driver.vehicleModel || ride.driver.vehiclePlate
@@ -129,7 +134,7 @@ function serializeRide(
 router.get("/", optionalAuth, async (req, res) => {
   const rides = await prisma.ride.findMany({
     include: {
-      driver: { select: { name: true, vehicleMake: true, vehicleModel: true, vehicleColor: true, vehiclePlate: true, vehicleSeats: true } },
+      driver: { select: { name: true, phoneNumber: true, vehicleMake: true, vehicleModel: true, vehicleColor: true, vehiclePlate: true, vehicleSeats: true } },
       bookings: {
         where: { status: "confirmed" },
         select: {
@@ -162,13 +167,13 @@ router.get("/mine", requireAuth, async (req, res) => {
   const rides = await prisma.ride.findMany({
     where: { driverId: userId },
     include: {
-      driver: { select: { name: true, vehicleMake: true, vehicleModel: true, vehicleColor: true, vehiclePlate: true, vehicleSeats: true } },
+      driver: { select: { name: true, phoneNumber: true, vehicleMake: true, vehicleModel: true, vehicleColor: true, vehiclePlate: true, vehicleSeats: true } },
       bookings: {
         where: { status: "confirmed" },
         select: {
           id: true, riderId: true, pickupPoint: true, pickupLat: true, pickupLng: true,
           dropoffPoint: true, dropoffLat: true, dropoffLng: true, fare: true,
-          rider: { select: { name: true } },
+          rider: { select: { name: true, phoneNumber: true } },
         },
       },
     },
@@ -182,6 +187,7 @@ router.get("/mine", requireAuth, async (req, res) => {
         id: b.id,
         riderId: b.riderId,
         riderName: b.rider.name,
+        riderPhone: b.rider.phoneNumber,
         pickupPoint: b.pickupPoint,
         pickupLat: b.pickupLat,
         pickupLng: b.pickupLng,
@@ -231,7 +237,7 @@ router.get("/recommended", requireAuth, async (req, res) => {
   const candidates = await prisma.ride.findMany({
     where: { driverId: { not: userId }, departureTime: { gte: new Date() } },
     include: {
-      driver: { select: { name: true, vehicleMake: true, vehicleModel: true, vehicleColor: true, vehiclePlate: true, vehicleSeats: true } },
+      driver: { select: { name: true, phoneNumber: true, vehicleMake: true, vehicleModel: true, vehicleColor: true, vehiclePlate: true, vehicleSeats: true } },
       bookings: {
         where: { status: "confirmed" },
         select: {
@@ -297,7 +303,7 @@ router.get("/nearby", requireAuth, async (req, res) => {
       ...(university ? { university } : {}),
     },
     include: {
-      driver: { select: { name: true, vehicleMake: true, vehicleModel: true, vehicleColor: true, vehiclePlate: true, vehicleSeats: true } },
+      driver: { select: { name: true, phoneNumber: true, vehicleMake: true, vehicleModel: true, vehicleColor: true, vehiclePlate: true, vehicleSeats: true } },
       bookings: {
         where: { status: "confirmed" },
         select: {
@@ -358,7 +364,7 @@ router.post("/", requireAuth, async (req, res) => {
       farePerSeat: Number(farePerSeat) || 0,
       driverId: req.user!.sub,
     },
-    include: { driver: { select: { name: true, vehicleMake: true, vehicleModel: true, vehicleColor: true, vehiclePlate: true, vehicleSeats: true } } },
+    include: { driver: { select: { name: true, phoneNumber: true, vehicleMake: true, vehicleModel: true, vehicleColor: true, vehiclePlate: true, vehicleSeats: true } } },
   });
 
   res.status(201).json({ ride: serializeRide(ride) });
@@ -401,7 +407,7 @@ router.post("/:id/join", requireAuth, async (req, res) => {
     return res.status(400).json({ error: "A pickup point on the ride's route is required." });
   }
 
-  const ride = await prisma.ride.findUnique({ where: { id: req.params.id }, include: { driver: { select: { name: true, vehicleMake: true, vehicleModel: true, vehicleColor: true, vehiclePlate: true, vehicleSeats: true } } } });
+  const ride = await prisma.ride.findUnique({ where: { id: req.params.id }, include: { driver: { select: { name: true, phoneNumber: true, vehicleMake: true, vehicleModel: true, vehicleColor: true, vehiclePlate: true, vehicleSeats: true } } } });
 
   if (!ride) {
     return res.status(404).json({ error: "Ride not found." });
@@ -448,7 +454,7 @@ router.post("/:id/join", requireAuth, async (req, res) => {
     prisma.ride.update({
       where: { id: ride.id },
       data: { seatsTaken: { increment: 1 } },
-      include: { driver: { select: { name: true, vehicleMake: true, vehicleModel: true, vehicleColor: true, vehiclePlate: true, vehicleSeats: true } } },
+      include: { driver: { select: { name: true, phoneNumber: true, vehicleMake: true, vehicleModel: true, vehicleColor: true, vehiclePlate: true, vehicleSeats: true } } },
     }),
   ]);
 
@@ -483,7 +489,7 @@ router.post("/:id/cancel", requireAuth, async (req, res) => {
     prisma.ride.update({
       where: { id: req.params.id },
       data: { seatsTaken: { decrement: 1 } },
-      include: { driver: { select: { name: true, vehicleMake: true, vehicleModel: true, vehicleColor: true, vehiclePlate: true, vehicleSeats: true } } },
+      include: { driver: { select: { name: true, phoneNumber: true, vehicleMake: true, vehicleModel: true, vehicleColor: true, vehiclePlate: true, vehicleSeats: true } } },
     }),
   ]);
 

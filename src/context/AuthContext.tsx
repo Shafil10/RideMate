@@ -25,6 +25,7 @@ interface AuthContextValue {
     name: string;
     email: string;
     password: string;
+    phoneNumber: string;
     defaultRole: UserRole;
     vehicle?: VehicleInput;
   }) => Promise<{ email: string }>;
@@ -75,6 +76,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     name: string;
     email: string;
     password: string;
+    phoneNumber: string;
     defaultRole: UserRole;
     vehicle?: VehicleInput;
   }) {

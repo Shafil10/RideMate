@@ -1,4 +1,4 @@
-import { Heart, ArrowRight, Users, Clock3 } from "lucide-react";
+import { Heart, ArrowRight, Users, Clock3, Phone } from "lucide-react";
 import { Avatar, Button, Card, Chip, StarRating } from "../ui";
 import type { Ride } from "../../lib/api";
 
@@ -68,10 +68,17 @@ export default function RideCard({ ride, onJoin, onCancel, onToggleFavorite, bus
       </div>
 
       {ride.myBooking && (
-        <div className="bg-primary-light/60 rounded-2xl px-3 py-2 text-xs text-primary-dark font-semibold">
-          Your pickup: {ride.myBooking.pickupPoint}
-          {ride.myBooking.dropoffPoint && <> → {ride.myBooking.dropoffPoint}</>}
-          {typeof ride.myBooking.fare === "number" && <> · ৳{ride.myBooking.fare}</>}
+        <div className="bg-primary-light/60 rounded-2xl px-3 py-2 text-xs text-primary-dark font-semibold flex flex-col gap-1">
+          <div>
+            Your pickup: {ride.myBooking.pickupPoint}
+            {ride.myBooking.dropoffPoint && <> → {ride.myBooking.dropoffPoint}</>}
+            {typeof ride.myBooking.fare === "number" && <> · ৳{ride.myBooking.fare}</>}
+          </div>
+          {ride.driverPhone && (
+            <a href={`tel:${ride.driverPhone}`} className="flex items-center gap-1.5 underline underline-offset-2">
+              <Phone size={12} /> Call {ride.driverName.split(" ")[0]}: {ride.driverPhone}
+            </a>
+          )}
         </div>
       )}
 

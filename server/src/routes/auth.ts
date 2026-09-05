@@ -16,6 +16,7 @@ function publicUser(user: {
   email: string;
   university: string;
   defaultRole: string;
+  phoneNumber: string | null;
   vehicleMake: string | null;
   vehicleModel: string | null;
   vehicleColor: string | null;
@@ -28,6 +29,7 @@ function publicUser(user: {
     email: user.email,
     university: user.university,
     defaultRole: user.defaultRole,
+    phoneNumber: user.phoneNumber,
     vehicleMake: user.vehicleMake,
     vehicleModel: user.vehicleModel,
     vehicleColor: user.vehicleColor,
@@ -41,10 +43,10 @@ function generateOtp(): string {
 }
 
 router.post("/signup/start", async (req, res) => {
-  const { name, email, password, defaultRole, vehicle } = req.body ?? {};
+  const { name, email, password, phoneNumber, defaultRole, vehicle } = req.body ?? {};
 
-  if (!name || !email || !password) {
-    return res.status(400).json({ error: "Name, email, and password are required." });
+  if (!name || !email || !password || !phoneNumber) {
+    return res.status(400).json({ error: "Name, email, password, and phone number are required." });
   }
 
   const role = defaultRole === "driver" ? "driver" : "passenger";
@@ -89,10 +91,12 @@ router.post("/signup/start", async (req, res) => {
         }
       : { vehicleMake: null, vehicleModel: null, vehicleColor: null, vehiclePlate: null, vehicleSeats: null };
 
+  const phoneNumberStr = String(phoneNumber).trim();
+
   await prisma.pendingSignup.upsert({
     where: { email: normalizedEmail },
-    create: { email: normalizedEmail, name, passwordHash, university, defaultRole: role, otpCode, otpExpiresAt, attempts: 0, ...vehicleFields },
-    update: { name, passwordHash, university, defaultRole: role, otpCode, otpExpiresAt, attempts: 0, ...vehicleFields },
+    create: { email: normalizedEmail, name, passwordHash, university, phoneNumber: phoneNumberStr, defaultRole: role, otpCode, otpExpiresAt, attempts: 0, ...vehicleFields },
+    update: { name, passwordHash, university, phoneNumber: phoneNumberStr, defaultRole: role, otpCode, otpExpiresAt, attempts: 0, ...vehicleFields },
   });
 
   try {
@@ -138,6 +142,7 @@ router.post("/signup/verify", async (req, res) => {
       email: pending.email,
       passwordHash: pending.passwordHash,
       university: pending.university,
+      phoneNumber: pending.phoneNumber,
       defaultRole: pending.defaultRole,
       vehicleMake: pending.vehicleMake,
       vehicleModel: pending.vehicleModel,

@@ -21,6 +21,7 @@ export default function LoginPage() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [phoneNumber, setPhoneNumber] = useState("");
   const [vehicleMake, setVehicleMake] = useState("");
   const [vehicleModel, setVehicleModel] = useState("");
   const [vehicleColor, setVehicleColor] = useState("");
@@ -60,6 +61,7 @@ export default function LoginPage() {
         name,
         email,
         password,
+        phoneNumber,
         defaultRole: role ?? "passenger",
         vehicle,
       });
@@ -258,6 +260,21 @@ export default function LoginPage() {
                 {mode === "signup" && (
                   <p className="text-xs text-text-muted -mt-2">
                     Your university is detected automatically from this email — sign up with the one your school gave you.
+                  </p>
+                )}
+                {mode === "signup" && (
+                  <Input
+                    label="Phone number"
+                    type="tel"
+                    value={phoneNumber}
+                    onChange={(e) => setPhoneNumber(e.target.value)}
+                    placeholder="e.g. 01712345678"
+                    required
+                  />
+                )}
+                {mode === "signup" && (
+                  <p className="text-xs text-text-muted -mt-2">
+                    Shared only with a driver or rider once you're actually booked on the same ride together.
                   </p>
                 )}
                 <Input

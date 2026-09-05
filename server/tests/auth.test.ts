@@ -88,6 +88,7 @@ describe("POST /api/auth/signup/start + /verify", () => {
       name: "Test Driver",
       email,
       password: "testpass123",
+      phoneNumber: "01700000000",
       university: "NSU",
       defaultRole: "driver",
     });
@@ -101,6 +102,7 @@ describe("POST /api/auth/signup/start + /verify", () => {
       name: "Test Passenger",
       email,
       password: "testpass123",
+      phoneNumber: "01700000000",
       university: "NSU",
       defaultRole: "passenger",
     });
@@ -125,6 +127,7 @@ describe("POST /api/auth/signup/start + /verify", () => {
       name: "Test Driver",
       email,
       password: "testpass123",
+      phoneNumber: "01700000000",
       university: "NSU",
       defaultRole: "driver",
       vehicle: { make: "Toyota", model: "Axio", color: "White", plate: "DHA-1234", seats: 4 },
@@ -142,6 +145,7 @@ describe("POST /api/auth/signup/start + /verify", () => {
       name: "Existing Test User",
       email: existingUserEmail,
       password: "whatever123",
+      phoneNumber: "01700000000",
       university: "NSU",
       defaultRole: "passenger",
     });
@@ -155,6 +159,7 @@ describe("Signup email domain validation", () => {
       name: "Not A Student",
       email: `vitest-gmail-${runId}@gmail.com`,
       password: "testpass123",
+      phoneNumber: "01700000000",
       defaultRole: "passenger",
     });
     expect(res.status).toBe(400);
@@ -167,6 +172,7 @@ describe("Signup email domain validation", () => {
       name: "Curated Domain Student",
       email,
       password: "testpass123",
+      phoneNumber: "01700000000",
       defaultRole: "passenger",
     });
     expect(res.status).toBe(200);
@@ -183,6 +189,7 @@ describe("Signup email domain validation", () => {
       name: "Fallback Domain Student",
       email,
       password: "testpass123",
+      phoneNumber: "01700000000",
       defaultRole: "passenger",
     });
     expect(res.status).toBe(200);
@@ -209,6 +216,7 @@ describe("POST /api/auth/reset-password/start + /verify", () => {
       name: "Reset Test",
       email,
       password: "originalpass123",
+      phoneNumber: "01700000000",
       university: "NSU",
       defaultRole: "passenger",
     });

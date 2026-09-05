@@ -13,6 +13,9 @@ model User {
   email        String   @unique
   passwordHash String
   university   String
+  // Shown to the other party only after a booking connects them (driver <-> rider),
+  // never to someone just browsing rides — see serializeRide/serializeRequest.
+  phoneNumber  String?
   // "passenger" | "driver" — a soft UI default only (which home screen a user lands
   // on after login), never checked as a server-side authorization gate. Anyone can
   // still offer or request a ride regardless of this value.
@@ -46,6 +49,7 @@ model PendingSignup {
   name         String
   passwordHash String
   university   String
+  phoneNumber  String?
   defaultRole  String   @default("passenger")
 
   vehicleMake  String?

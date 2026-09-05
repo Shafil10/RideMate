@@ -1,16 +1,20 @@
 import { Capacitor } from "@capacitor/core";
 
-// On the emulator, "localhost" is tunneled back to the dev machine via `adb reverse`.
-// A real phone has no such tunnel — it needs the dev machine's actual LAN IP,
-// which must be set in .env (VITE_API_HOST) since it changes per network.
-//
 // On the web, "/api" relies on Vite's dev-server proxy (vite.config.ts) and only
 // works when the frontend and backend are on the same origin — true in local dev,
 // not true once the frontend is a static deploy (Vercel) talking to a separately
 // hosted backend (Render). VITE_API_BASE_URL overrides it with the real backend
 // URL for that case; unset in local dev, so "/api" + the proxy keeps working there.
+//
+// On native (Android), there's no dev-server proxy and no same-origin relationship
+// at all, so it always needs an absolute URL. A release APK built for distribution
+// sets VITE_API_BASE_URL to the deployed Render backend so it works on any network.
+// If that's unset (local Capacitor dev/testing only), it falls back to the dev
+// machine's LAN IP on port 4000 — "localhost" doesn't reach the dev machine from a
+// real phone (only the emulator, via `adb reverse`), so VITE_API_HOST must be set
+// in .env for that case, and changes per network.
 const API_BASE = Capacitor.isNativePlatform()
-  ? `http://${import.meta.env.VITE_API_HOST || "localhost"}:4000/api`
+  ? import.meta.env.VITE_API_BASE_URL || `http://${import.meta.env.VITE_API_HOST || "localhost"}:4000/api`
   : import.meta.env.VITE_API_BASE_URL || "/api";
 
 export interface Ride {
@@ -29,6 +33,9 @@ export interface Ride {
   farePerSeat: number;
   driverId: string;
   driverName: string;
+  // Only ever populated once you have a booking on this ride — never shown
+  // while just browsing/searching, so it's null until myBooking is set.
+  driverPhone: string | null;
   driverRating: { average: number; count: number; ridesCompleted: number; label: string | null } | null;
   driverVehicle: { make: string | null; model: string | null; color: string | null; plate: string | null; seats: number | null } | null;
   createdAt: string;
@@ -113,6 +120,7 @@ export interface RideBooking {
   id: string;
   riderId: string;
   riderName: string;
+  riderPhone: string | null;
   pickupPoint: string;
   pickupLat: number | null;
   pickupLng: number | null;
@@ -356,6 +364,7 @@ export interface AuthUser {
   email: string;
   university: string;
   defaultRole: UserRole;
+  phoneNumber: string | null;
   vehicleMake: string | null;
   vehicleModel: string | null;
   vehicleColor: string | null;
@@ -379,6 +388,7 @@ export function startSignup(input: {
   name: string;
   email: string;
   password: string;
+  phoneNumber: string;
   defaultRole: UserRole;
   vehicle?: VehicleInput;
 }): Promise<{ message: string; email: string }> {
